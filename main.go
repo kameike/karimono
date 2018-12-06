@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/kameike/karimono/handler"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
-	"karimono/handler"
 	"os"
 )
 
