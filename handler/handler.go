@@ -143,11 +143,12 @@ func writeItems(b []Borrowing) error {
 }
 
 func readItems() ([]Borrowing, error) {
-	file, err := os.OpenFile(pathname, os.O_RDONLY, 0666)
+	file, err := os.OpenFile(pathname, os.O_WRONLY, 0666)
 
 	if os.IsNotExist(err) {
 		return []Borrowing{}, nil
 	} else if err != nil {
+		println(err.Error())
 		return nil, err
 	}
 
@@ -157,6 +158,7 @@ func readItems() ([]Borrowing, error) {
 
 	var items []Borrowing
 	if err := json.Unmarshal(bytes, &items); err != nil {
+		println(err.Error())
 		return nil, err
 	}
 
