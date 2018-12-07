@@ -32,24 +32,24 @@ func Borrow() echo.HandlerFunc {
 		bytes, err := ioutil.ReadAll(c.Request().Body)
 
 		if err != nil {
-			c.Error(err)
+			return err
 		}
 
 		err = json.Unmarshal(bytes, &b)
 		if err != nil {
-			c.Error(err)
+			return err
 		}
 
 		current, err := readItems()
 		if err != nil {
-			c.Error(err)
+			return err
 		}
 
 		result := merge(current, b)
 
 		err = writeItems(result)
 		if err != nil {
-			c.Error(err)
+			return err
 		}
 
 		return c.String(200, "ok")
@@ -143,7 +143,7 @@ func writeItems(b []Borrowing) error {
 }
 
 func readItems() ([]Borrowing, error) {
-	file, err := os.OpenFile(pathname, os.O_WRONLY, 0666)
+	file, err := os.OpenFile(pathname, os.O_RDONLY, 0666)
 
 	if os.IsNotExist(err) {
 		return []Borrowing{}, nil
@@ -155,8 +155,13 @@ func readItems() ([]Borrowing, error) {
 	defer file.Close()
 
 	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		println(err.Error())
+		return nil, err
+	}
 
 	var items []Borrowing
+
 	if err := json.Unmarshal(bytes, &items); err != nil {
 		println(err.Error())
 		return nil, err

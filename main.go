@@ -21,8 +21,8 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.POST("/item/borrow", handler.Borrow())
-	e.POST("/item/return", handler.Return())
+	e.POST("/items/borrow", handler.Borrow())
+	e.POST("/items/return", handler.Return())
 
 	e.GET("/items", handler.Items())
 
