@@ -1,171 +1,155 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
 
+	"github.com/kameike/karimono/model"
+	"github.com/kameike/karimono/util"
 	"github.com/labstack/echo"
+	sqlite3 "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 )
 
-type Borrowing struct {
-	User string `json:"user"`
-	Item string `json:"item"`
+func openDb() *sql.DB {
+	db, err := sql.Open("sqlite3", "./db/main.db")
+	util.CheckInternalFatalError(err)
+	return db
 }
 
-type Returning struct {
-	Item string `json:"item"`
-}
+type handerWithAccount func(user model.Account, c echo.Context) error
 
-func (b1 Borrowing) equal(b2 Borrowing) bool {
-	return b1.User == b2.User && b1.Item == b2.Item
-}
+func updateAccount(user model.Account, c echo.Context) error {
 
-func (b1 Borrowing) equalItem(b2 Borrowing) bool {
-	return b1.Item == b2.Item
-}
-
-func Borrow() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		var b Borrowing
-		bytes, err := ioutil.ReadAll(c.Request().Body)
-
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(bytes, &b)
-		if err != nil {
-			return err
-		}
-
-		current, err := readItems()
-		if err != nil {
-			return err
-		}
-
-		result := merge(current, b)
-
-		err = writeItems(result)
-		if err != nil {
-			return err
-		}
-
-		return c.String(200, "ok")
-	}
-}
-
-func Return() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		bytes, err := ioutil.ReadAll(c.Request().Body)
-
-		if err != nil {
-			c.Error(err)
-		}
-
-		var r Returning
-
-		err = json.Unmarshal(bytes, &r)
-		if err != nil {
-			c.Error(err)
-		}
-
-		current, err := readItems()
-
-		result := delete(current, r)
-
-		err = writeItems(result)
-		if err != nil {
-			c.Error(err)
-		}
-
-		if err != nil {
-			c.Error(err)
-		}
-
-		return c.String(200, "ok")
-	}
-}
-
-func delete(bs []Borrowing, r Returning) []Borrowing {
-	var result = make([]Borrowing, 0)
-
-	for _, target := range bs {
-		if !(target.Item == r.Item) {
-			result = append(result, target)
-		}
-	}
-
-	return result
-}
-
-func merge(bs []Borrowing, b Borrowing) []Borrowing {
-	var result = make([]Borrowing, 0)
-
-	for _, target := range bs {
-		if !target.equalItem(b) {
-			result = append(result, target)
-		}
-	}
-
-	result = append(result, b)
-	return result
-}
-
-func Items() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		items, err := readItems()
-
-		if err != nil {
-			c.Error(err)
-		}
-
-		return c.JSON(http.StatusOK, items)
-	}
-}
-
-const pathname = "./tmp/data.json"
-
-func writeItems(b []Borrowing) error {
-	bytes, err := json.Marshal(b)
-
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(pathname, bytes, 0666)
-	if err != nil {
-		return err
-	}
+	var reqBody model.AccountCreateRequest
+	d := json.NewDecoder(c.Request().Body)
+	err := d.Decode(&reqBody)
+	util.CheckInternalFatalError(err)
 
 	return nil
 }
 
-func readItems() ([]Borrowing, error) {
-	file, err := os.OpenFile(pathname, os.O_RDONLY, 0666)
+var UpdateAccount = checkAuth(updateAccount)
 
-	if os.IsNotExist(err) {
-		return []Borrowing{}, nil
-	} else if err != nil {
-		println(err.Error())
-		return nil, err
+func checkAuth(handler handerWithAccount) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		db := openDb()
+		defer db.Close()
+
+		token := c.Request().Header.Get("x-karimono-token")
+
+		smit, err := db.Prepare(`
+select account.name, account.id from access_token join account on access_token.account_id = account.id 
+		where session_token = ?
+	`)
+
+		rows, err := smit.Query(token)
+		defer rows.Close()
+		util.CheckInternalFatalError(err)
+
+		var account model.Account
+		for rows.Next() {
+			rows.Scan(&account.Name, &account.Id)
+		}
+
+		if account.Id == "" {
+			err := model.ErrorResponse{"invalid auth"}
+			c.JSON(403, err)
+			return nil
+		}
+		return handler(account, c)
+	}
+}
+
+func CreateAccountHandler(c echo.Context) error {
+	d := json.NewDecoder(c.Request().Body)
+	var res model.AccountCreateRequest
+	d.Decode(&res)
+
+	db := openDb()
+	defer db.Close()
+
+	pass, err := bcrypt.GenerateFromPassword([]byte(res.Password), bcrypt.DefaultCost)
+	util.CheckInternalFatalError(err)
+
+	tx, err := db.Begin()
+	util.CheckInternalFatalError(err)
+
+	smit, err := db.Prepare("insert into account(name, password_hash) values(?,?)")
+	_, err = smit.Exec(res.Name, string(pass))
+	if serr, ok := err.(sqlite3.Error); ok && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
+		resbody := model.ErrorResponse{"name has aliready taken"}
+		c.JSON(400, resbody)
+		return nil
+	}
+	util.CheckInternalFatalError(err)
+
+	token, err := renewToken(res.Name, db)
+	util.CheckInternalFatalError(err)
+
+	tx.Commit()
+
+	result := model.AccountCreateResponse{
+		AccessToken: token,
 	}
 
-	defer file.Close()
+	c.JSON(200, result)
+	return nil
+}
 
-	bytes, err := ioutil.ReadAll(file)
+func renewToken(name string, db *sql.DB) (string, error) {
+	token := util.RandString(100)
+
+	query := `
+	insert or replace into access_token (account_id, session_token)
+	select id, ? from account where name = ? 
+	`
+	smit, err := db.Prepare(query)
+	util.CheckInternalFatalError(err)
+	_, err = smit.Exec(token, name)
+	util.CheckInternalFatalError(err)
+
+	return token, nil
+}
+
+func RenewAccessTokenHandler(c echo.Context) error {
+	d := json.NewDecoder(c.Request().Body)
+	var requestBody model.AccountCreateRequest
+	err := d.Decode(&requestBody)
+	util.CheckInternalFatalError(err)
+
+	db := openDb()
+	defer db.Close()
+
+	smit, err := db.Prepare(`
+		select password_hash, name, id from account where name = ?
+	`)
+
+	rows, err := smit.Query(requestBody.Name)
+	defer rows.Close()
+
+	util.CheckInternalFatalError(err)
+
+	var account model.Account
+	var passHash []byte
+	for rows.Next() {
+		rows.Scan(&passHash, &account.Name, &account.Id)
+	}
+
+	err = bcrypt.CompareHashAndPassword(passHash, []byte(requestBody.Password))
 	if err != nil {
-		println(err.Error())
-		return nil, err
+		msg := model.ErrorResponse{"id or pass is wrong"}
+		c.JSON(400, msg)
+		return nil
+	}
+	util.CheckInternalFatalError(err)
+
+	token, err := renewToken(account.Name, db)
+	result := model.AccountCreateResponse{
+		AccessToken: token,
 	}
 
-	var items []Borrowing
+	c.JSON(200, result)
 
-	if err := json.Unmarshal(bytes, &items); err != nil {
-		println(err.Error())
-		return nil, err
-	}
-
-	return items, nil
+	return nil
 }
