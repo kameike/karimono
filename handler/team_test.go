@@ -2,13 +2,12 @@ package handler
 
 import (
 	"database/sql"
-
 	"github.com/kameike/karimono/util"
-	_ "github.com/mattn/go-sqlite3"
+	"testing"
 )
 
-func openDb() *sql.DB {
-	db, err := sql.Open("sqlite3", "./db/main.db")
+func Test(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
 	util.CheckInternalFatalError(err)
-	return db
+	print(db)
 }

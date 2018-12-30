@@ -29,11 +29,11 @@ func main() {
 	e.GET("/teams/id/menbers", stub)    // チームメンバーを一覧する
 	e.DELETE("/teams/id/menbers", stub) // チームから抜ける
 
-	e.GET("/teams", stub)                // 参加しているチームの情報を見る
-	e.POST("/teams/id", stub)            // チームを作成する
+	e.GET("/teams", handler.GetTeams)    // 参加しているチームの情報を見る
+	e.POST("/teams", stub)               // チームを作成する
 	e.PUT("/teams/id", stub)             // チーム情報のアップデート
 	e.GET("/teams/id", stub)             // チーム情報を取得する
-	e.GET("/teams/histories", stub)      // チームで起きたことの履歴を見る
+	e.GET("/teams/id/histories", stub)   // チームで起きたことの履歴を見る
 	e.GET("/teams/id/borrowings", stub)  // チームでアイテムを借りる
 	e.POST("/teams/id/borrowings", stub) // チームでアイテムを借りる
 
