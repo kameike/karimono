@@ -35,3 +35,5 @@ type AccountCreateRequest struct {
 type AccountCreateResponse struct {
 	AccessToken string `json:"accessToken"`
 }
+
+type AccessTokenHolder interface{}
