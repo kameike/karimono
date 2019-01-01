@@ -34,7 +34,7 @@ select account.name, account.id from access_token join account on access_token.a
 
 		var account model.Account
 		for rows.Next() {
-			rows.Scan(&account.Name, &account.Id)
+			rows.Scan(&account.Id, &account.Id)
 		}
 
 		if account.Id == "" {

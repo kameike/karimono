@@ -2,8 +2,8 @@ package model
 
 // premetives
 type Account struct {
-	Name string `json:"name"`
-	Id   string `json:"id"`
+	Id    string `json:"name"`
+	Token string `json:access_token`
 }
 
 type Hisotry struct {
@@ -30,6 +30,14 @@ type ErrorResponse struct {
 type AccountCreateRequest struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
+}
+
+func (self AccountCreateRequest) AccountId() string {
+	return self.Name
+}
+
+func (self AccountCreateRequest) AccountPassword() string {
+	return self.Password
 }
 
 type AccountCreateResponse struct {
