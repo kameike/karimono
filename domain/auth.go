@@ -1,8 +1,7 @@
 package domain
 
 import (
-	"database/sql"
-
+	. "github.com/kameike/karimono/error"
 	"github.com/kameike/karimono/model"
 	"github.com/kameike/karimono/repository"
 	"github.com/kameike/karimono/util"
@@ -18,15 +17,12 @@ type AccountIdProvider interface {
 	AccountId() string
 }
 
-type AccountIdUpdateRequester interface {
+type AccountCreateRequester interface {
+	AccountPasswordProvider
 	AccountIdProvider
 }
 
-type AccountPasswordUpdateRequester interface {
-	AccountPasswordProvider
-}
-
-type AccountCreateRequester interface {
+type AccountSignInRequester interface {
 	AccountPasswordProvider
 	AccountIdProvider
 }
@@ -36,15 +32,12 @@ type AccountDescriber interface {
 }
 
 type AccountAccessTokenProvider interface {
-	Token() string
+	AccountAccessToken() string
 }
 
 type AuthDomain interface {
 	CreateAccount(AccountCreateRequester) (*model.Account, error)
-	UpdateAccountPassword(AccountPasswordProvider) (*model.Account, error)
-	UpdateAccountId(AccountIdProvider) (*model.Account, error)
-	GetAccount() (*model.Account, error)
-	RenewAccessToken() (*model.Account, error)
+	SignInAccount(AccountSignInRequester) (*model.Account, error)
 }
 
 type applicationAuthDomain struct {
@@ -52,12 +45,9 @@ type applicationAuthDomain struct {
 }
 
 func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*model.Account, error) {
-	self.repo.BeginTransaction()
-	defer self.repo.EndTransaction()
-
 	createReq := repository.InsertAccountRequest{
 		Id:                req.AccountId(),
-		EncryptedPassword: encryptPassword(req.AccountPassword()),
+		EncryptedPassword: hashPassword(req.AccountPassword()),
 	}
 
 	err := self.repo.InsertAccount(createReq)
@@ -69,46 +59,37 @@ func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*m
 
 	account := model.Account{
 		Token: token,
-		Id:    req.AccountId(),
+		Name:  req.AccountId(),
 	}
 
-	self.repo.InsertOrReplaceAccessToken(repository.UpdateOrReqlaceAccessTokenRequest{
-		Account:  account,
-		NewToken: token,
+	self.repo.UpdateOrReplaceAccessToken(repository.UpdateOrReqlaceAccessTokenRequest{
+		AccountName: account.Name,
+		NewToken:    token,
 	})
 
 	return &account, nil
 }
 
-func (self *applicationAuthDomain) UpdateAccountPassword(rep AccountPasswordProvider) (*model.Account, error) {
+func (self *applicationAuthDomain) SignInAccount(req AccountSignInRequester) (*model.Account, error) {
 	return nil, nil
 }
 
-func (self *applicationAuthDomain) UpdateAccountId(req AccountIdProvider) (*model.Account, error) {
-	return nil, nil
-}
-
-func encryptPassword(plainPass string) string {
+func hashPassword(plainPass string) string {
 	pass, err := bcrypt.GenerateFromPassword([]byte(plainPass), bcrypt.DefaultCost)
 	util.CheckInternalFatalError(err)
 
 	return string(pass)
 }
 
+func checkPasswordHash(plainPass string, hashedPassword string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(plainPass))
+
+	if err != nil {
+		return ApplicationError{ErrorInvalidTeamPassword}
+	}
+	return nil
+}
+
 func newToken() string {
 	return util.RandString(100)
-}
-
-func (self *applicationAuthDomain) GetAccount() (*model.Account, error) {
-	return nil, nil
-}
-
-func (self *applicationAuthDomain) RenewAccessToken() (*model.Account, error) {
-	return nil, nil
-}
-
-func renewToken(name string, db *sql.DB) (string, error) {
-	token := util.RandString(100)
-
-	return token, nil
 }

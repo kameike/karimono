@@ -1,16 +1,23 @@
 package domain
 
-import "github.com/kameike/karimono/repository"
+import (
+	. "github.com/kameike/karimono/error"
+	"github.com/kameike/karimono/repository"
+)
 
 type DomainsProvider interface {
 	GetAuthDomain() AuthDomain
 	GetAccountDomain() (AccountDomain, error)
 	GetTeamDomain(TeamIdProvider) (TeamDomain, error)
-	GetBorrowingDomain(TeamIdProvider) (BorrowingDomain, error)
 	CloseSession()
 }
 
-func CreateApplicatoinDomains() DomainsProvider {
+type TokenStatusProvider interface {
+	AccountAccessTokenProvider
+	HasToken() bool
+}
+
+func CreateApplicatoinDomains(token TokenStatusProvider) DomainsProvider {
 	repo := repository.CreateApplicationDataRepository()
 
 	authDomain := applicationAuthDomain{
@@ -19,16 +26,19 @@ func CreateApplicatoinDomains() DomainsProvider {
 
 	provider := applicationDomainProvider{
 		authDomain: &authDomain,
+		tokenState: token,
+		repository: repo,
 	}
 
 	return &provider
 }
 
 type applicationDomainProvider struct {
-	authDomain      AuthDomain
-	accountDomain   AccountDomain
-	teamDomain      TeamDomain
-	borrowingDomain BorrowingDomain
+	repository    repository.DataRepository
+	tokenState    TokenStatusProvider
+	authDomain    AuthDomain
+	accountDomain AccountDomain
+	teamDomain    TeamDomain
 }
 
 func (self *applicationDomainProvider) GetAuthDomain() AuthDomain {
@@ -36,15 +46,58 @@ func (self *applicationDomainProvider) GetAuthDomain() AuthDomain {
 }
 
 func (self *applicationDomainProvider) GetAccountDomain() (AccountDomain, error) {
-	return nil, nil
+	if self.accountDomain != nil {
+		return self.accountDomain, nil
+	}
+
+	if !self.tokenState.HasToken() {
+		return nil, ApplicationError{ErrorInvalidAccessToken}
+	}
+
+	result, err := self.repository.CheckAuth(repository.AuthCheckRequest{
+		AccessToken: self.tokenState.AccountAccessToken(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	domain := createAccountApplicatoinDomain(*result, self.repository)
+	self.accountDomain = domain
+
+	return domain, nil
 }
 
-func (self *applicationDomainProvider) GetTeamDomain(TeamIdProvider) (TeamDomain, error) {
-	return nil, nil
-}
+func (self *applicationDomainProvider) GetTeamDomain(req TeamIdProvider) (TeamDomain, error) {
+	accountDomain, err := self.GetAccountDomain()
+	if err != nil {
+		return nil, err
+	}
 
-func (self *applicationDomainProvider) GetBorrowingDomain(TeamIdProvider) (BorrowingDomain, error) {
-	return nil, nil
+	account := accountDomain.GetAccount()
+
+	r := self.repository
+
+	err = r.CheckAccountTeamRelation(repository.CheckAccountTeamRelationRequest{
+		AccountName: account.Name,
+		TeamName:    req.TeamId(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	team, err := r.GetTeam(repository.GetTeamRequest{
+		TeamName: req.TeamId(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	domain := createApplicationTeamDomain(*account, *team, r)
+
+	return domain, nil
 }
 
 func (self *applicationDomainProvider) CloseSession() {

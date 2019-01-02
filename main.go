@@ -21,9 +21,9 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.POST("/account", handler.CreateAccountHandler)  //アカウント作成
-	e.POST("/token", handler.RenewAccessTokenHandler) //アカウント作成
-	e.PUT("/account", handler.UpdateAccount)          //アカウント情報のアップデート
+	e.POST("/account", handler.SignUp)       //アカウント作成
+	e.POST("/token", handler.SignIn)         //アカウント作成
+	e.PUT("/account", handler.UpdateAccount) //アカウント情報のアップデート
 
 	e.POST("/teams/id/menbers", stub)   // チームにサインインする
 	e.GET("/teams/id/menbers", stub)    // チームメンバーを一覧する

@@ -1,18 +1,5 @@
 package handler
 
-import (
-	"database/sql"
-
-	"github.com/kameike/karimono/model"
-	"github.com/labstack/echo"
-)
-
-var UpdateAccount = injectDbConn(checkAuth(updateAccount))
-
-func updateAccount(user model.Account, db *sql.DB, c echo.Context) error {
-	return nil
-}
-
 // func updateAccount(user model.Account, db *sql.DB, c echo.Context) error {
 // 	var reqBody model.AccountCreateRequest
 // 	d := json.NewDecoder(c.Request().Body)

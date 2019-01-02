@@ -1,62 +1,31 @@
 package handler
 
 import (
-	"encoding/json"
-
-	"github.com/kameike/karimono/domain"
 	"github.com/kameike/karimono/model"
-	"github.com/labstack/echo"
 )
 
-var CreateAccountHandler = createHandler().createAccount
-
-var RenewAccessTokenHandler = createHandler().renewAccessToken
-
-type Handler struct {
-	provider domain.DomainsProvider
+func (self *Handler) updateAccount() error {
+	return nil
 }
 
-func createHandler() *Handler {
-	handler := Handler{
-		provider: domain.CreateApplicatoinDomains(),
-	}
-
-	return &handler
-}
-
-type Contents struct {
-	code    int
-	content []byte
-}
-
-func bodyAsJson(target interface{}, c echo.Context) {
-	d := json.NewDecoder(c.Request().Body)
-	d.Decode(target)
-}
-
-func (self *Handler) createAccount(c echo.Context) error {
+func (self *Handler) createAccount() error {
 	var res model.AccountCreateRequest
-	bodyAsJson(&res, c)
+	self.bodyAsJson(&res)
 
 	authDomain := self.provider.GetAuthDomain()
 	account, err := authDomain.CreateAccount(res)
 
 	if err == nil {
-		renderError(err, c)
+		self.renderError(err)
 		return nil
 	}
 
-	c.JSON(200, account)
-
+	self.renderJson(account)
 	return nil
 }
 
-func (self *Handler) renewAccessToken(c echo.Context) error {
+func (self *Handler) renewAccessToken() error {
 	return nil
-}
-
-func renderError(err error, c echo.Context) {
-	c.String(400, "damedame")
 }
 
 // func CreateAccountHandler(c echo.Context) error {

@@ -2,7 +2,8 @@ package model
 
 // premetives
 type Account struct {
-	Id    string `json:"name"`
+	Id    int    `json:"id"`
+	Name  string `json:"name"`
 	Token string `json:access_token`
 }
 

@@ -1,11 +1,11 @@
 
-create table if not exists user (
+create table if not exists account_team (
   id integer primary key autoincrement,
   team_id integer not null,
   account_id integer not null,
   created_at text default (datetime('now', 'localtime'))
 );
-create index if not exists user_index on user(team_id, id, account_id);
+create index if not exists user_index on account_team(team_id, id, account_id);
 
 create table if not exists account (
   id integer primary key autoincrement,
