@@ -57,7 +57,7 @@ type UpdateAccountIdRequest struct {
 }
 
 type GetAccountRequest struct {
-	AccountName string
+	Token string
 }
 
 type GetAccountHistoryRequest struct {
@@ -109,19 +109,26 @@ type GetTeamBorrowingRequest struct {
 	TeamName string
 }
 
-type DataRepository interface {
+type DataBaseProxy interface {
 	BeginTransaction()
 	EndTransaction()
 	CancelTransaction()
+}
 
+type AuthDataReposity interface {
 	InsertAccount(InsertAccountRequest) error
 	UpdateOrReplaceAccessToken(UpdateOrReqlaceAccessTokenRequest)
-	CheckAuth(AuthCheckRequest) (*model.Account, error)
 	UpdateAccountPassword(UpdateAccountPasswordRequest) error
 	UpdateAccountId(UpdateAccountIdRequest) error
-	GetAccount(GetAccountRequest) (*model.Account, error)
+	GetAccountWithSecretInfo(GetAccountRequest) (*model.Me, error)
 
+	CheckAuth(AuthCheckRequest) error
 	CheckAccountTeamRelation(CheckAccountTeamRelationRequest) error
+}
+
+type DataRepository interface {
+	AuthDataReposity
+	DataBaseProxy
 
 	GetTeamPasswordHash(GetTeamPasswordHashRequest) (string, error)
 	CreateTeam(CreateTeamRequest) error
@@ -193,28 +200,23 @@ func (self *applicationDataRepository) CancelTransaction() {
 	self._tx = nil
 }
 
-func (self *applicationDataRepository) CheckAuth(req AuthCheckRequest) (*model.Account, error) {
-	smit, err := self.db().Prepare(`
-select account.name, account.id from access_token join account on access_token.account_id = account.id
-		where session_token = ?
-	`)
-	defer smit.Close()
+func (self *applicationDataRepository) CheckAuth(req AuthCheckRequest) error {
+	query := `
+	select account.name, account.id from access_token join account on access_token.account_id = account.id
+	where token = ?
+	`
 
-	rows, err := smit.Query(req.AccessToken)
+	rows, err := self.db().Query(query, req.AccessToken)
 	defer rows.Close()
 	util.CheckInternalFatalError(err)
 
-	var account model.Account
-	for rows.Next() {
-		rows.Scan(&account.Name, &account.Id)
+	if rows.Next() {
+		return nil
+	} else {
+		return ApplicationError{ErrorInvalidAccessToken}
 	}
-
-	if account.Name == "" {
-		return nil, ApplicationError{ErrorInvalidAccessToken}
-	}
-
-	return &account, nil
 }
+
 func (self *applicationDataRepository) InsertAccount(req InsertAccountRequest) error {
 	if req.Id == "" {
 		return ApplicationError{ErrorInvalidAccountName}
@@ -229,25 +231,29 @@ func (self *applicationDataRepository) InsertAccount(req InsertAccountRequest) e
 	return nil
 }
 
-func (self *applicationDataRepository) GetAccount(req GetAccountRequest) (*model.Account, error) {
+func (self *applicationDataRepository) GetAccountWithSecretInfo(req GetAccountRequest) (*model.Me, error) {
 	query := `
-		select id, name, password_hash from account where name = ?
+	select account.id, account.name, account.password_hash, access_token.token from account
+	join access_token on access_token.account_id = account.id
+	where access_token.token = ?
 	`
-	row := self.db().QueryRow(query, req.AccountName)
+	row := self.db().QueryRow(query, req.Token)
 
-	var account model.Account
-	err := row.Scan(&account.Id, &account.Name, &account.PasswordHash)
+	var account model.Me
+	err := row.Scan(&account.Id, &account.Name, &account.PasswordHash, &account.Token)
 
 	if err == sql.ErrNoRows {
 		return nil, ApplicationError{ErrorDataNotFount}
 	}
+
+	util.CheckInternalFatalError(err)
 
 	return &account, nil
 }
 
 func (self *applicationDataRepository) UpdateOrReplaceAccessToken(req UpdateOrReqlaceAccessTokenRequest) {
 	query := `
-	insert or replace into access_token (account_id, session_token)
+	insert or replace into access_token (account_id, token)
 	select id, ? from account where name = ? 
 	`
 	smit, err := self.db().Prepare(query)
@@ -335,7 +341,7 @@ func (self *applicationDataRepository) UpdateAccountPassword(req UpdateAccountPa
 	result, err := self.db().Exec(query, req.HashedPassword, req.AccountName)
 	util.CheckInternalFatalError(err)
 
-	count, _ := result.RowsAffected()
+	count, err := result.RowsAffected()
 	if count == 0 {
 		return ApplicationError{ErrorDataNotFount}
 	}

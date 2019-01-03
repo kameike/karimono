@@ -37,10 +37,10 @@ create table if not exists account (
 create table if not exists access_token(
   id integer primary key autoincrement,
   account_id integer not null unique,
-  session_token text not null unique,
+  token text not null unique,
   created_at text default (datetime('now', 'localtime'))
 );
-create index if not exists token_index on access_token(session_token);
+create index if not exists token_index on access_token(token);
 
 create table if not exists team (
   id integer primary key autoincrement,
@@ -90,6 +90,19 @@ func TestCreateAccount(t *testing.T) {
 	count := checkCount("account", r.db())
 	if count != 1 {
 		t.Fatalf("user count should be 1 but %d", count)
+	}
+}
+
+func TestFindInvalidAccount(t *testing.T) {
+	r := inMemoryRepo()
+	createDummyAccount(r)
+
+	_, err := r.GetAccountWithSecretInfo(GetAccountRequest{
+		Token: "bad token",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
 	}
 }
 
@@ -157,8 +170,12 @@ func TestCheckAuthWithAccessToken(t *testing.T) {
 		NewToken:    token,
 	})
 
-	account, _ := r.CheckAuth(AuthCheckRequest{
+	r.CheckAuth(AuthCheckRequest{
 		AccessToken: token,
+	})
+
+	account, _ := r.GetAccountWithSecretInfo(GetAccountRequest{
+		Token: token,
 	})
 
 	if account.Name != "hoge" {
@@ -169,37 +186,11 @@ func TestCheckAuthWithAccessToken(t *testing.T) {
 func TestCheckAuthFailRequest(t *testing.T) {
 	r := inMemoryRepo()
 
-	_, err := r.CheckAuth(AuthCheckRequest{
+	err := r.CheckAuth(AuthCheckRequest{
 		AccessToken: "wrong",
 	})
 
 	if invalidError(apperror.ErrorInvalidAccessToken, err) {
-		t.Fail()
-	}
-}
-
-func TestGetAccount(t *testing.T) {
-	r := inMemoryRepo()
-	createDummyAccount(r)
-
-	account, _ := r.GetAccount(GetAccountRequest{
-		AccountName: dummyAccountName,
-	})
-
-	if account.Name != dummyAccountName {
-		t.Fail()
-	}
-}
-
-func TestGetNotExistAccount(t *testing.T) {
-	r := inMemoryRepo()
-	createDummyAccount(r)
-
-	_, err := r.GetAccount(GetAccountRequest{
-		AccountName: "noman",
-	})
-
-	if invalidError(apperror.ErrorDataNotFount, err) {
 		t.Fail()
 	}
 }
@@ -368,8 +359,8 @@ func TestUpdateAccountId(t *testing.T) {
 		NewAccountName: newName,
 	})
 
-	account, _ := r.GetAccount(GetAccountRequest{
-		AccountName: newName,
+	account, _ := r.GetAccountWithSecretInfo(GetAccountRequest{
+		Token: dummyAccountToken,
 	})
 
 	if account.Name != "newName" {
@@ -388,8 +379,8 @@ func TestUpdateAccountPassword(t *testing.T) {
 		AccountName:    dummyAccountName,
 	})
 
-	account, _ := r.GetAccount(GetAccountRequest{
-		AccountName: dummyAccountName,
+	account, _ := r.GetAccountWithSecretInfo(GetAccountRequest{
+		Token: dummyAccountToken,
 	})
 
 	if account.PasswordHash != newPassword {
@@ -652,6 +643,8 @@ const dummyAccountName = "testUser"
 const dummyTeamAccounHistoryCount = 3
 const dummyAccounHistoryCount = 5
 const dummyTeamHistoryCount = 2
+const dummyTeamName = "testTeam"
+const dummyAccountToken = "tokentoken"
 
 func assertCountEqual(t *testing.T, db queryExecter, tableName string, expectCount int) {
 	count := checkCount(tableName, db)
@@ -714,14 +707,17 @@ func dummyAccountJoinToDummyTeam(r DataRepository) {
 	})
 }
 
-func createDummyAccount(r DataRepository) error {
-	return r.InsertAccount(InsertAccountRequest{
+func createDummyAccount(r DataRepository) {
+	r.InsertAccount(InsertAccountRequest{
 		Id:                dummyAccountName,
 		EncryptedPassword: "pass",
 	})
-}
 
-const dummyTeamName = "testTeam"
+	r.UpdateOrReplaceAccessToken(UpdateOrReqlaceAccessTokenRequest{
+		AccountName: dummyAccountName,
+		NewToken:    dummyAccountToken,
+	})
+}
 
 func createDummyTeam(r DataRepository) error {
 	err := r.CreateTeam(CreateTeamRequest{
@@ -739,9 +735,9 @@ func getDummyTeam(r DataRepository) *model.Team {
 	return team
 }
 
-func getDummyAccount(r DataRepository) *model.Account {
-	account, _ := r.GetAccount(GetAccountRequest{
-		AccountName: dummyAccountName,
+func getDummyAccount(r DataRepository) *model.Me {
+	account, _ := r.GetAccountWithSecretInfo(GetAccountRequest{
+		Token: dummyAccountToken,
 	})
 
 	return account

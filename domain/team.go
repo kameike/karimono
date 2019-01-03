@@ -32,12 +32,12 @@ type TeamDomain interface {
 }
 
 type applicationTeamDomain struct {
-	account    model.Account
+	account    model.Me
 	team       model.Team
 	repository repository.DataRepository
 }
 
-func createApplicationTeamDomain(account model.Account, team model.Team, repository repository.DataRepository) TeamDomain {
+func createApplicationTeamDomain(account model.Me, team model.Team, repository repository.DataRepository) TeamDomain {
 	domain := applicationTeamDomain{
 		account:    account,
 		team:       team,
@@ -47,7 +47,9 @@ func createApplicationTeamDomain(account model.Account, team model.Team, reposit
 	return &domain
 }
 func (self *applicationTeamDomain) UpdateTeamPassword(TeamPasswordUpdateRequester) (*model.Team, error) {
+	// r := self.repository
 	return nil, nil
+
 }
 func (self *applicationTeamDomain) UpdateTeamName(TeamNameUpdateRequester) (*model.Team, error) {
 	return nil, nil

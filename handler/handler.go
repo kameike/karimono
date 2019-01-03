@@ -16,8 +16,12 @@ func SignIn(c echo.Context) error {
 	return createHandler(c).renewAccessToken()
 }
 
-func GeneralHandler(c echo.Context) error {
-	return nil
+func UpdateAccount(c echo.Context) error {
+	return createHandler(c).updateAccount()
+}
+
+type errorResponse struct {
+	Message string `json:"message"`
 }
 
 type TokenProvider struct {

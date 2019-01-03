@@ -36,15 +36,15 @@ type AccountAccessTokenProvider interface {
 }
 
 type AuthDomain interface {
-	CreateAccount(AccountCreateRequester) (*model.Account, error)
-	SignInAccount(AccountSignInRequester) (*model.Account, error)
+	CreateAccount(AccountCreateRequester) (*model.Me, error)
+	SignInAccount(AccountSignInRequester) (*model.Me, error)
 }
 
 type applicationAuthDomain struct {
 	repo repository.DataRepository
 }
 
-func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*model.Account, error) {
+func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*model.Me, error) {
 	createReq := repository.InsertAccountRequest{
 		Id:                req.AccountId(),
 		EncryptedPassword: hashPassword(req.AccountPassword()),
@@ -57,20 +57,19 @@ func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*m
 
 	token := newToken()
 
-	account := model.Account{
-		Token: token,
-		Name:  req.AccountId(),
-	}
-
 	self.repo.UpdateOrReplaceAccessToken(repository.UpdateOrReqlaceAccessTokenRequest{
-		AccountName: account.Name,
+		AccountName: req.AccountId(),
 		NewToken:    token,
 	})
 
-	return &account, nil
+	account, err := self.repo.GetAccountWithSecretInfo(repository.GetAccountRequest{
+		Token: token,
+	})
+
+	return account, nil
 }
 
-func (self *applicationAuthDomain) SignInAccount(req AccountSignInRequester) (*model.Account, error) {
+func (self *applicationAuthDomain) SignInAccount(req AccountSignInRequester) (*model.Me, error) {
 	return nil, nil
 }
 

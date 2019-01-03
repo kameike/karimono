@@ -46,12 +46,12 @@ type AccountDomain interface {
 	LeaveTeam(LeaveTeamRequestor) error
 	GetHistory() ([]model.Hisotry, error)
 	GetBorrowings() ([]model.Borrowing, error)
-	UpdateAccountPassword(AccountPasswordProvider) (*model.Account, error)
-	UpdateAccountId(AccountIdProvider) (*model.Account, error)
-	GetAccount() *model.Account
+	UpdateAccountPassword(AccountPasswordProvider) (*model.Me, error)
+	UpdateAccountId(AccountIdUpdateRequester) (*model.Me, error)
+	GetAccount() *model.Me
 }
 
-func createAccountApplicatoinDomain(account model.Account, repo repository.DataRepository) AccountDomain {
+func createAccountApplicatoinDomain(account model.Me, repo repository.DataRepository) AccountDomain {
 	domain := applicationAccountDomain{
 		account:    account,
 		repository: repo,
@@ -61,7 +61,7 @@ func createAccountApplicatoinDomain(account model.Account, repo repository.DataR
 }
 
 type applicationAccountDomain struct {
-	account    model.Account
+	account    model.Me
 	repository repository.DataRepository
 }
 
@@ -160,7 +160,7 @@ func (self *applicationAccountDomain) GetBorrowings() ([]model.Borrowing, error)
 
 	return borrowings, err
 }
-func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordProvider) (*model.Account, error) {
+func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordProvider) (*model.Me, error) {
 	r := self.repository
 	r.BeginTransaction()
 
@@ -173,8 +173,8 @@ func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordP
 		return nil, err
 	}
 
-	account, err := r.GetAccount(repository.GetAccountRequest{
-		AccountName: self.account.Name,
+	account, err := r.GetAccountWithSecretInfo(repository.GetAccountRequest{
+		Token: self.account.Token,
 	})
 
 	if err != nil {
@@ -188,26 +188,25 @@ func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordP
 		NewToken:    token,
 	})
 
-	account.Token = token
 	self.account = *account
 
 	r.EndTransaction()
 	return account, nil
 }
 
-func (self *applicationAccountDomain) UpdateAccountId(req AccountIdProvider) (*model.Account, error) {
+func (self *applicationAccountDomain) UpdateAccountId(req AccountIdUpdateRequester) (*model.Me, error) {
 	r := self.repository
 
 	err := r.UpdateAccountId(repository.UpdateAccountIdRequest{
-		OldAccountName: self.account.Token,
+		OldAccountName: self.account.Name,
 		NewAccountName: req.AccountId(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := r.GetAccount(repository.GetAccountRequest{
-		AccountName: self.account.Name,
+	account, err := r.GetAccountWithSecretInfo(repository.GetAccountRequest{
+		Token: self.account.Token,
 	})
 
 	if err != nil {
@@ -219,6 +218,6 @@ func (self *applicationAccountDomain) UpdateAccountId(req AccountIdProvider) (*m
 	return account, nil
 }
 
-func (self *applicationAccountDomain) GetAccount() *model.Account {
+func (self *applicationAccountDomain) GetAccount() *model.Me {
 	return &self.account
 }

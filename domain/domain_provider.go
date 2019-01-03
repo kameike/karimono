@@ -54,10 +54,17 @@ func (self *applicationDomainProvider) GetAccountDomain() (AccountDomain, error)
 		return nil, ApplicationError{ErrorInvalidAccessToken}
 	}
 
-	result, err := self.repository.CheckAuth(repository.AuthCheckRequest{
+	err := self.repository.CheckAuth(repository.AuthCheckRequest{
 		AccessToken: self.tokenState.AccountAccessToken(),
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := self.repository.GetAccountWithSecretInfo(repository.GetAccountRequest{
+		Token: self.tokenState.AccountAccessToken(),
+	})
 	if err != nil {
 		return nil, err
 	}
