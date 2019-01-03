@@ -9,14 +9,15 @@ type Account struct {
 }
 
 type Hisotry struct {
-	text      string `json:"name"`
-	timestamp string `json:"name"`
+	Text      string `json:"name"`
+	Timestamp string `json:"name"`
 }
 
 type Borrowing struct {
 	ItemName string  `json:"itemName"`
 	Uuid     string  `json:"uuid"`
 	Account  Account `json:"account"`
+	Team     Team    `json:"account"`
 }
 
 type Team struct {

@@ -7,6 +7,7 @@ const ErrorInvalidAccountName = 3
 const ErrorDataNotFount = 4
 const ErrorTeamNameAlreadyTaken = 5
 const ErrorAlreadyJoin = 6
+const ErrorNoRelationBetweenUserAndTeam = 7
 
 type ApplicationError struct {
 	Code int

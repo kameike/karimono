@@ -34,7 +34,6 @@ create table if not exists account (
   created_at text default (datetime('now', 'localtime'))
 );
 
-
 create table if not exists access_token(
   id integer primary key autoincrement,
   account_id integer not null unique,
@@ -53,18 +52,21 @@ create index if not exists team_index on team(id);
 
 create table if not exists borrowing(
   id integer primary key autoincrement,
-  user_id integer not null,
+	account_id integer not null,
+	team_id integer not null,
+	hashed_id text not null unique,
   name text not null,
   memo text not null,
   has_return text not null,
   created_at text default (datetime('now', 'localtime'))
 );
-create index if not exists borrowing_index on borrowing(user_id, id);
+create index if not exists borrowing_index on borrowing(account_id, team_id, hashed_id, id);
 
 create table if not exists history(
   id integer primary key autoincrement,
-  team_id integer not null,
-  notion text not null,
+  team_id integer,
+	account_id integer,
+	text text not null,
   created_at text default (datetime('now', 'localtime'))
 );
 create index if not exists history_index on history(team_id);
@@ -318,6 +320,63 @@ func TestLeaveTeam(t *testing.T) {
 	assertCountEqual(t, r.db(), "account_team", 0)
 }
 
+func TestUpdateNotExistUserPassword(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	newPassword := "newpassword"
+
+	err := r.UpdateAccountPassword(UpdateAccountPasswordRequest{
+		HashedPassword: newPassword,
+		AccountName:    "noman",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
+	}
+}
+
+func TestUpdateAccountIdWhichAlreadyTaken(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	newName := "newName"
+
+	r.InsertAccount(InsertAccountRequest{
+		EncryptedPassword: "password",
+		Id:                newName,
+	})
+
+	err := r.UpdateAccountId(UpdateAccountIdRequest{
+		OldAccountName: dummyAccountName,
+		NewAccountName: newName,
+	})
+
+	if invalidError(apperror.ErrorAccountNameAlreadyTaken, err) {
+		t.Fail()
+	}
+}
+
+func TestUpdateAccountId(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	newName := "newName"
+
+	r.UpdateAccountId(UpdateAccountIdRequest{
+		OldAccountName: dummyAccountName,
+		NewAccountName: newName,
+	})
+
+	account, _ := r.GetAccount(GetAccountRequest{
+		AccountName: newName,
+	})
+
+	if account.Name != "newName" {
+		t.Fatalf("acount name should be %s but get %s", newName, account.Name)
+	}
+}
+
 func TestUpdateAccountPassword(t *testing.T) {
 	r := inMemoryRepo()
 	dummyAccountJoinToDummyTeam(r)
@@ -338,6 +397,262 @@ func TestUpdateAccountPassword(t *testing.T) {
 	}
 }
 
+func TestCreateTeamAccountHistoryRequest(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateTeamAccountHistory(CreateTeamAccountHistoryRequest{
+		AccountName: dummyAccountName,
+		TeamName:    dummyTeamName,
+		History:     "borrow xxx",
+	})
+
+	assertCountEqual(t, r.db(), "history", 1)
+}
+
+func TestCreateInvalidTeamAccountHistoryRequest(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	err := r.CreateTeamAccountHistory(CreateTeamAccountHistoryRequest{
+		AccountName: dummyAccountName,
+		TeamName:    "invalid team",
+		History:     "borrow xxx",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
+	}
+
+	err = r.CreateTeamAccountHistory(CreateTeamAccountHistoryRequest{
+		AccountName: "invalid account",
+		TeamName:    dummyTeamName,
+		History:     "borrow xxx",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
+	}
+
+	assertCountEqual(t, r.db(), "history", 0)
+}
+
+func TestCreateTeamHistory(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateTeamHistory(CreateTeamHistoryRequest{
+		History:  "hoge",
+		TeamName: dummyTeamName,
+	})
+
+	assertCountEqual(t, r.db(), "history", 1)
+}
+
+func TestCreateInvalidTeamHistory(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	err := r.CreateTeamHistory(CreateTeamHistoryRequest{
+		History:  "message",
+		TeamName: "invalid team",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
+	}
+
+	assertCountEqual(t, r.db(), "history", 0)
+}
+
+func TestCreateInvalidAccountHistory(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	err := r.CreateAccountHistory(CreateAccountHistoryRequest{
+		History:     "message",
+		AccountName: "invalid team",
+	})
+
+	if invalidError(apperror.ErrorDataNotFount, err) {
+		t.Fail()
+	}
+
+	assertCountEqual(t, r.db(), "history", 0)
+}
+
+func TestCreateAccountHistory(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateAccountHistory(CreateAccountHistoryRequest{
+		AccountName: dummyAccountName,
+		History:     "history",
+	})
+
+	assertCountEqual(t, r.db(), "history", 1)
+}
+
+func TestGetTeamHisotry(t *testing.T) {
+	r := inMemoryRepo()
+	createDummyTeamAcountWithHistory(r)
+
+	result, _ := r.GetTeamHistory(GetTeamHistoryRequest{
+		TeamName: dummyTeamName,
+	})
+
+	size := len(result)
+
+	if size != dummyTeamHistoryCount+dummyTeamAccounHistoryCount {
+		t.Fatalf("size should be %d, but got %d", dummyTeamHistoryCount+dummyTeamAccounHistoryCount, size)
+	}
+}
+
+func TestGetAccountHistory(t *testing.T) {
+	r := inMemoryRepo()
+	createDummyTeamAcountWithHistory(r)
+
+	result, _ := r.GetAccountHistory(GetAccountHistoryRequest{
+		AccountName: dummyAccountName,
+	})
+
+	size := len(result)
+	expected := dummyAccounHistoryCount + dummyTeamAccounHistoryCount
+
+	if size != expected {
+		t.Fatalf("count data should be %d but got %d", expected, size)
+	}
+}
+
+func TestAccountTeamRelation(t *testing.T) {
+	r := inMemoryRepo()
+	createDummyTeamAcountWithHistory(r)
+
+	err := r.CheckAccountTeamRelation(CheckAccountTeamRelationRequest{
+		AccountName: dummyAccountName,
+		TeamName:    dummyTeamName,
+	})
+
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func TestAccountTeamRelationWhenNotJoined(t *testing.T) {
+	r := inMemoryRepo()
+	createDummyAccount(r)
+	createDummyTeam(r)
+
+	err := r.CheckAccountTeamRelation(CheckAccountTeamRelationRequest{
+		AccountName: dummyAccountName,
+		TeamName:    dummyTeamName,
+	})
+
+	if invalidError(apperror.ErrorNoRelationBetweenUserAndTeam, err) {
+		t.Fail()
+	}
+}
+
+func TestCreateAccountBorrowing(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      "borrowinghoge",
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+
+	assertCountEqual(t, r.db(), "borrowing", 1)
+}
+
+func TestGetAccountBorrowing(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      "borrowinghoge",
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      "fugafuga",
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+
+	result, _ := r.GetAccountBorrowing(GetAccountBorrowingRequset{
+		AccountName: dummyAccountName,
+	})
+
+	if len(result) != 2 {
+		t.Fatalf("%d should be %d", len(result), 2)
+	}
+}
+
+func TestGetTeamBorrowing(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      "borrowinghoge",
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      "fugafuga",
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+
+	result, _ := r.GetTeamBorrowing(GetTeamBorrowingRequest{
+		TeamName: dummyTeamName,
+	})
+
+	if len(result) != 2 {
+		t.Fatalf("%d should be %d", len(result), 2)
+	}
+
+}
+
+func TestReturnItem(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	borrowingId := "hashsed_id"
+
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      borrowingId,
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+
+	r.ReturnBorrowing(ReturnBorrowingRequest{
+		BorrowingId: borrowingId,
+	})
+
+	result, _ := r.GetAccountBorrowing(GetAccountBorrowingRequset{
+		AccountName: dummyAccountName,
+	})
+
+	if len(result) != 0 {
+		t.Fail()
+	}
+}
+
+// ===== STUBMING =====
+
+const dummyAccountName = "testUser"
+const dummyTeamAccounHistoryCount = 3
+const dummyAccounHistoryCount = 5
+const dummyTeamHistoryCount = 2
+
 func assertCountEqual(t *testing.T, db queryExecter, tableName string, expectCount int) {
 	count := checkCount(tableName, db)
 	if count != expectCount {
@@ -345,7 +660,46 @@ func assertCountEqual(t *testing.T, db queryExecter, tableName string, expectCou
 	}
 }
 
-const dummyAccountName = "testUser"
+func createDummyTeamAcountWithHistory(r DataRepository) {
+	dummyAccountJoinToDummyTeam(r)
+
+	for i := 0; ; {
+		r.CreateTeamHistory(CreateTeamHistoryRequest{
+			TeamName: dummyTeamName,
+			History:  "test",
+		})
+
+		i += 1
+		if i >= dummyTeamHistoryCount {
+			break
+		}
+	}
+
+	for i := 0; ; {
+		r.CreateTeamAccountHistory(CreateTeamAccountHistoryRequest{
+			AccountName: dummyAccountName,
+			TeamName:    dummyTeamName,
+			History:     "test",
+		})
+
+		i += 1
+		if i >= dummyTeamAccounHistoryCount {
+			break
+		}
+	}
+
+	for i := 0; ; {
+		r.CreateAccountHistory(CreateAccountHistoryRequest{
+			AccountName: dummyAccountName,
+			History:     "test",
+		})
+
+		i += 1
+		if i >= dummyAccounHistoryCount {
+			break
+		}
+	}
+}
 
 func dummyAccountJoinToDummyTeam(r DataRepository) {
 	createDummyTeam(r)

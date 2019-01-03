@@ -77,6 +77,38 @@ type CheckAccountTeamRelationRequest struct {
 	TeamName    string
 }
 
+type CreateTeamAccountHistoryRequest struct {
+	TeamName    string
+	AccountName string
+	History     string
+}
+
+type CreateTeamHistoryRequest struct {
+	TeamName string
+	History  string
+}
+
+type CreateAccountHistoryRequest struct {
+	AccountName string
+	History     string
+}
+
+type CreateBorrowingRequest struct {
+	ItemName         string
+	BorrowingId      string
+	BorrwoingAccount string
+	BorrwoedTeam     string
+	Memo             string
+}
+
+type ReturnBorrowingRequest struct {
+	BorrowingId string
+}
+
+type GetTeamBorrowingRequest struct {
+	TeamName string
+}
+
 type DataRepository interface {
 	BeginTransaction()
 	EndTransaction()
@@ -99,7 +131,16 @@ type DataRepository interface {
 
 	GetAccountHistory(GetAccountHistoryRequest) ([]model.Hisotry, error)
 	GetTeamHistory(GetTeamHistoryRequest) ([]model.Hisotry, error)
+
+	CreateTeamAccountHistory(CreateTeamAccountHistoryRequest) error
+	CreateTeamHistory(CreateTeamHistoryRequest) error
+	CreateAccountHistory(CreateAccountHistoryRequest) error
+
+	CreateBorrowing(CreateBorrowingRequest) error
+	ReturnBorrowing(ReturnBorrowingRequest) error
+
 	GetAccountBorrowing(GetAccountBorrowingRequset) ([]model.Borrowing, error)
+	GetTeamBorrowing(GetTeamBorrowingRequest) ([]model.Borrowing, error)
 }
 
 func CreateApplicationDataRepository() DataRepository {
@@ -286,26 +327,248 @@ func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team,
 	return team, nil
 }
 
-func (self *applicationDataRepository) UpdateAccountPassword(UpdateAccountPasswordRequest) error {
+func (self *applicationDataRepository) UpdateAccountPassword(req UpdateAccountPasswordRequest) error {
+	query := `
+	update account set password_hash = ? 
+	where name = ?
+	`
+	result, err := self.db().Exec(query, req.HashedPassword, req.AccountName)
+	util.CheckInternalFatalError(err)
+
+	count, _ := result.RowsAffected()
+	if count == 0 {
+		return ApplicationError{ErrorDataNotFount}
+	}
 	return nil
 }
 
-func (self *applicationDataRepository) UpdateAccountId(UpdateAccountIdRequest) error {
+func (self *applicationDataRepository) UpdateAccountId(req UpdateAccountIdRequest) error {
+	query := `
+	update account set name = ?
+	where name = ?
+	`
+	_, err := self.db().Exec(query, req.NewAccountName, req.OldAccountName)
+
+	if serr, ok := err.(sqlite3.Error); ok && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
+		return ApplicationError{ErrorAccountNameAlreadyTaken}
+	}
+	util.CheckInternalFatalError(err)
+
 	return nil
 }
 
-func (self *applicationDataRepository) GetAccountHistory(GetAccountHistoryRequest) ([]model.Hisotry, error) {
-	return nil, nil
-}
+func (self *applicationDataRepository) CreateTeamAccountHistory(req CreateTeamAccountHistoryRequest) error {
+	query := `
+	insert into history (team_id, account_id, text)
+	select team.id, account.id, ? from account
+	join team
+	where team.name = ? and account.name = ?
+	`
 
-func (self *applicationDataRepository) GetTeamHistory(GetTeamHistoryRequest) ([]model.Hisotry, error) {
-	return nil, nil
-}
+	result, err := self.db().Exec(query, req.History, req.TeamName, req.AccountName)
+	util.CheckInternalFatalError(err)
 
-func (self *applicationDataRepository) GetAccountBorrowing(GetAccountBorrowingRequset) ([]model.Borrowing, error) {
-	return nil, nil
-}
+	count, err := result.RowsAffected()
 
-func (self *applicationDataRepository) CheckAccountTeamRelation(CheckAccountTeamRelationRequest) error {
+	if count == 0 {
+		return ApplicationError{ErrorDataNotFount}
+	}
+
 	return nil
+}
+
+func (self *applicationDataRepository) CreateTeamHistory(req CreateTeamHistoryRequest) error {
+	query := `
+	insert into history (team_id, text)
+	select team.id, ? from team
+	where team.name = ?
+	`
+	result, err := self.db().Exec(query, req.History, req.TeamName)
+	util.CheckInternalFatalError(err)
+
+	count, err := result.RowsAffected()
+
+	if count == 0 {
+		return ApplicationError{ErrorDataNotFount}
+	}
+
+	return nil
+}
+
+func (self *applicationDataRepository) CreateAccountHistory(req CreateAccountHistoryRequest) error {
+	query := `
+	insert into history (account_id, text)
+	select account.id, ? from account
+	where account.name = ?
+	`
+	result, err := self.db().Exec(query, req.History, req.AccountName)
+	util.CheckInternalFatalError(err)
+
+	count, err := result.RowsAffected()
+
+	if count == 0 {
+		return ApplicationError{ErrorDataNotFount}
+	}
+
+	return nil
+}
+
+func (self *applicationDataRepository) GetTeamHistory(req GetTeamHistoryRequest) ([]model.Hisotry, error) {
+	query := `
+	select text, created_at from history
+	where team_id in
+	(
+		select id from team
+		where name = ?
+	)
+	`
+
+	rows, err := self.db().Query(query, req.TeamName)
+	defer rows.Close()
+	util.CheckInternalFatalError(err)
+
+	result := []model.Hisotry{}
+
+	for rows.Next() {
+		history := model.Hisotry{}
+		rows.Scan(&history.Text, &history.Timestamp)
+		result = append(result, history)
+	}
+
+	return result, nil
+}
+
+func (self *applicationDataRepository) GetAccountHistory(req GetAccountHistoryRequest) ([]model.Hisotry, error) {
+	query := `
+	select text, created_at from history
+	where account_id in
+	(
+		select id from account
+		where name = ?
+	)
+	`
+
+	rows, err := self.db().Query(query, req.AccountName)
+	defer rows.Close()
+	util.CheckInternalFatalError(err)
+
+	result := []model.Hisotry{}
+
+	for rows.Next() {
+		history := model.Hisotry{}
+		rows.Scan(&history.Text, &history.Timestamp)
+		result = append(result, history)
+	}
+
+	return result, nil
+}
+
+func (self *applicationDataRepository) CheckAccountTeamRelation(req CheckAccountTeamRelationRequest) error {
+	query := `
+	 select 1 from account_team
+	 where (team_id, account_id) in
+	 (
+	 	select team.id, account.id from team
+		left join account
+	 	where team.name = ? and account.name = ?
+	 )
+	 `
+
+	rows, err := self.db().Query(query, req.TeamName, req.AccountName)
+	util.CheckInternalFatalError(err)
+
+	if rows.Next() {
+		return nil
+	} else {
+		return ApplicationError{ErrorNoRelationBetweenUserAndTeam}
+	}
+}
+
+func (self *applicationDataRepository) CreateBorrowing(req CreateBorrowingRequest) error {
+	query := `
+	insert into borrowing(account_id, team_id, hashed_id, name, has_return, memo)
+	select account.id, team.id, ?, ?, false, ? from team
+	left join account
+	where team.name = ? and account.name = ?
+	`
+	_, err := self.db().Exec(query, req.BorrowingId, req.ItemName, req.Memo, req.BorrwoedTeam, req.BorrwoingAccount)
+	util.CheckInternalFatalError(err)
+
+	return nil
+}
+
+func (self *applicationDataRepository) GetAccountBorrowing(req GetAccountBorrowingRequset) ([]model.Borrowing, error) {
+	query := `
+	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	join account on account.id = borrowing.account_id
+	join team on team.id = borrowing.team_id
+	where account.name = ? and borrowing.has_return = false
+	`
+	rows, err := self.db().Query(query, req.AccountName)
+	defer rows.Close()
+	util.CheckInternalFatalError(err)
+
+	var borrowings []model.Borrowing
+
+	for rows.Next() {
+		account := model.Account{}
+		team := model.Team{}
+		borrowing := model.Borrowing{}
+		rows.Scan(
+			&borrowing.ItemName,
+			&borrowing.Uuid,
+			&account.Id,
+			&account.Name,
+			&team.Id,
+			&team.Name)
+		borrowing.Account = account
+		borrowing.Team = team
+
+		borrowings = append(borrowings, borrowing)
+	}
+
+	return borrowings, nil
+}
+
+func (self *applicationDataRepository) ReturnBorrowing(req ReturnBorrowingRequest) error {
+	query := `
+	update borrowing set has_return = true where hashed_id = ?
+	`
+	_, err := self.db().Exec(query, req.BorrowingId)
+	util.CheckInternalFatalError(err)
+
+	return nil
+}
+
+func (self *applicationDataRepository) GetTeamBorrowing(req GetTeamBorrowingRequest) ([]model.Borrowing, error) {
+	query := `
+	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	join account on account.id = borrowing.account_id
+	join team on team.id = borrowing.team_id
+	where team.name = ? and borrowing.has_return = false
+	`
+	rows, err := self.db().Query(query, req.TeamName)
+	defer rows.Close()
+	util.CheckInternalFatalError(err)
+
+	var borrowings []model.Borrowing
+
+	for rows.Next() {
+		account := model.Account{}
+		team := model.Team{}
+		borrowing := model.Borrowing{}
+		rows.Scan(
+			&borrowing.ItemName,
+			&borrowing.Uuid,
+			&account.Id,
+			&account.Name,
+			&team.Id,
+			&team.Name)
+		borrowing.Account = account
+		borrowing.Team = team
+
+		borrowings = append(borrowings, borrowing)
+	}
+
+	return borrowings, nil
 }
