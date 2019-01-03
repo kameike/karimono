@@ -73,7 +73,7 @@ create index if not exists history_index on history(team_id);
 	db.Exec(query)
 
 	return &applicationDataRepository{
-		db: db,
+		_db: db,
 	}
 }
 
@@ -85,7 +85,7 @@ func TestCreateAccount(t *testing.T) {
 		EncryptedPassword: "pass",
 	})
 
-	count := checkCount("account", r.db)
+	count := checkCount("account", r.db())
 	if count != 1 {
 		t.Fatalf("user count should be 1 but %d", count)
 	}
@@ -134,7 +134,7 @@ func TestCreateOrReqlaceAccessToken(t *testing.T) {
 		NewToken:    "verylongtoken",
 	})
 
-	count := checkCount("access_token", r.db)
+	count := checkCount("access_token", r.db())
 	if count != 1 {
 		t.Fatalf("count should be 1 but result is %d", count)
 	}
@@ -207,7 +207,7 @@ func TestCreateTeam(t *testing.T) {
 
 	createDummyTeam(r)
 
-	count := checkCount("team", r.db)
+	count := checkCount("team", r.db())
 	if count != 1 {
 		t.Fatalf("count should be 1 but %d", count)
 	}
@@ -219,7 +219,7 @@ func TestTeamNameShouldBeUniqe(t *testing.T) {
 	createDummyTeam(r)
 	err := createDummyTeam(r)
 
-	count := checkCount("team", r.db)
+	count := checkCount("team", r.db())
 	if count != 1 {
 		t.Fatalf("count should be 1 but %d", count)
 	}
@@ -263,7 +263,7 @@ func TestInvalidJoin(t *testing.T) {
 		TeamName:    "pixiv",
 	})
 
-	count := checkCount("account_team", r.db)
+	count := checkCount("account_team", r.db())
 	if count != 0 {
 		t.Fatalf("count should be 0 but got %d", count)
 	}
@@ -292,10 +292,7 @@ func TestPreventDoubleJoinTeam(t *testing.T) {
 		TeamName:    "newTeam",
 	})
 
-	count := checkCount("account_team", r.db)
-	if count != 2 {
-		t.Fatalf("count should be 1 but got %d", count)
-	}
+	assertCountEqual(t, r.db(), "account_team", 2)
 
 	if invalidError(apperror.ErrorAlreadyJoin, err) {
 		t.Fail()
@@ -306,11 +303,46 @@ func TestJoinTeam(t *testing.T) {
 	r := inMemoryRepo()
 	dummyAccountJoinToDummyTeam(r)
 
-	count := checkCount("account_team", r.db)
-	if count != 1 {
-		t.Fatalf("count should be 1 but got %d", count)
-	}
+	assertCountEqual(t, r.db(), "account_team", 1)
+}
 
+func TestLeaveTeam(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	r.DeleteTeamAccountReleation(DeleteTeamAccountReleationRequest{
+		AccountName: dummyAccountName,
+		TeamName:    dummyTeamName,
+	})
+
+	assertCountEqual(t, r.db(), "account_team", 0)
+}
+
+func TestUpdateAccountPassword(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	newPassword := "newpassword"
+
+	r.UpdateAccountPassword(UpdateAccountPasswordRequest{
+		HashedPassword: newPassword,
+		AccountName:    dummyAccountName,
+	})
+
+	account, _ := r.GetAccount(GetAccountRequest{
+		AccountName: dummyAccountName,
+	})
+
+	if account.PasswordHash != newPassword {
+		t.Fatalf("fail to update password")
+	}
+}
+
+func assertCountEqual(t *testing.T, db queryExecter, tableName string, expectCount int) {
+	count := checkCount(tableName, db)
+	if count != expectCount {
+		t.Fatalf("count rows of %s should be %d but got %d", tableName, expectCount, count)
+	}
 }
 
 const dummyAccountName = "testUser"
@@ -370,7 +402,7 @@ func invalidError(code int, err error) bool {
 	return e.Code != code
 }
 
-func checkCount(table string, db *sql.DB) int {
+func checkCount(table string, db queryExecter) int {
 	row := db.QueryRow(fmt.Sprintf("select count(1) from %s", table))
 	var count int
 	err := row.Scan(&count)

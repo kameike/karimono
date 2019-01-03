@@ -164,9 +164,17 @@ func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordP
 	r := self.repository
 	r.BeginTransaction()
 
-	account, err := r.UpdateAccountPassword(repository.UpdateAccountPasswordRequest{
+	err := r.UpdateAccountPassword(repository.UpdateAccountPasswordRequest{
 		AccountName:    self.account.Name,
 		HashedPassword: hashPassword(req.AccountPassword()),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := r.GetAccount(repository.GetAccountRequest{
+		AccountName: self.account.Name,
 	})
 
 	if err != nil {
@@ -190,9 +198,16 @@ func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordP
 func (self *applicationAccountDomain) UpdateAccountId(req AccountIdProvider) (*model.Account, error) {
 	r := self.repository
 
-	account, err := r.UpdateAccountId(repository.UpdateAccountIdRequest{
+	err := r.UpdateAccountId(repository.UpdateAccountIdRequest{
 		OldAccountName: self.account.Token,
 		NewAccountName: req.AccountId(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := r.GetAccount(repository.GetAccountRequest{
+		AccountName: self.account.Name,
 	})
 
 	if err != nil {

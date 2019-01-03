@@ -85,8 +85,8 @@ type DataRepository interface {
 	InsertAccount(InsertAccountRequest) error
 	UpdateOrReplaceAccessToken(UpdateOrReqlaceAccessTokenRequest)
 	CheckAuth(AuthCheckRequest) (*model.Account, error)
-	UpdateAccountPassword(UpdateAccountPasswordRequest) (*model.Account, error)
-	UpdateAccountId(UpdateAccountIdRequest) (*model.Account, error)
+	UpdateAccountPassword(UpdateAccountPasswordRequest) error
+	UpdateAccountId(UpdateAccountIdRequest) error
 	GetAccount(GetAccountRequest) (*model.Account, error)
 
 	CheckAccountTeamRelation(CheckAccountTeamRelationRequest) error
@@ -106,9 +106,8 @@ func CreateApplicationDataRepository() DataRepository {
 	db := openDb()
 
 	repo := applicationDataRepository{
-		db: db,
+		_db: db,
 	}
-
 	return &repo
 }
 
@@ -119,12 +118,42 @@ func openDb() *sql.DB {
 }
 
 type applicationDataRepository struct {
-	db *sql.DB
-	tx *sql.Tx
+	_db *sql.DB
+	_tx *sql.Tx
+}
+
+type queryExecter interface {
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Prepare(query string) (*sql.Stmt, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+func (self *applicationDataRepository) db() queryExecter {
+	if self._tx != nil {
+		return self._tx
+	}
+	return self._db
+}
+
+func (self *applicationDataRepository) BeginTransaction() {
+	tx, err := self._db.Begin()
+	util.CheckInternalFatalError(err)
+	self._tx = tx
+}
+
+func (self *applicationDataRepository) EndTransaction() {
+	self._tx.Commit()
+	self._tx = nil
+}
+
+func (self *applicationDataRepository) CancelTransaction() {
+	self._tx.Rollback()
+	self._tx = nil
 }
 
 func (self *applicationDataRepository) CheckAuth(req AuthCheckRequest) (*model.Account, error) {
-	smit, err := self.db.Prepare(`
+	smit, err := self.db().Prepare(`
 select account.name, account.id from access_token join account on access_token.account_id = account.id
 		where session_token = ?
 	`)
@@ -145,27 +174,12 @@ select account.name, account.id from access_token join account on access_token.a
 
 	return &account, nil
 }
-
-func (self *applicationDataRepository) BeginTransaction() {
-	tx, err := self.db.Begin()
-	util.CheckInternalFatalError(err)
-	self.tx = tx
-}
-
-func (self *applicationDataRepository) EndTransaction() {
-	self.tx.Commit()
-}
-
-func (self *applicationDataRepository) CancelTransaction() {
-	self.tx.Rollback()
-}
-
 func (self *applicationDataRepository) InsertAccount(req InsertAccountRequest) error {
 	if req.Id == "" {
 		return ApplicationError{ErrorInvalidAccountName}
 	}
 
-	smit, err := self.db.Prepare("insert into account(name, password_hash) values(?,?)")
+	smit, err := self.db().Prepare("insert into account(name, password_hash) values(?,?)")
 	_, err = smit.Exec(req.Id, req.EncryptedPassword)
 	if serr, ok := err.(sqlite3.Error); ok && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
 		return ApplicationError{ErrorAccountNameAlreadyTaken}
@@ -176,12 +190,12 @@ func (self *applicationDataRepository) InsertAccount(req InsertAccountRequest) e
 
 func (self *applicationDataRepository) GetAccount(req GetAccountRequest) (*model.Account, error) {
 	query := `
-		select id, name from account where name = ?
+		select id, name, password_hash from account where name = ?
 	`
-	row := self.db.QueryRow(query, req.AccountName)
+	row := self.db().QueryRow(query, req.AccountName)
 
 	var account model.Account
-	err := row.Scan(&account.Id, &account.Name)
+	err := row.Scan(&account.Id, &account.Name, &account.PasswordHash)
 
 	if err == sql.ErrNoRows {
 		return nil, ApplicationError{ErrorDataNotFount}
@@ -195,7 +209,7 @@ func (self *applicationDataRepository) UpdateOrReplaceAccessToken(req UpdateOrRe
 	insert or replace into access_token (account_id, session_token)
 	select id, ? from account where name = ? 
 	`
-	smit, err := self.db.Prepare(query)
+	smit, err := self.db().Prepare(query)
 	util.CheckInternalFatalError(err)
 	_, err = smit.Exec(req.NewToken, req.AccountName)
 	util.CheckInternalFatalError(err)
@@ -209,7 +223,7 @@ func (self *applicationDataRepository) CreateTeam(req CreateTeamRequest) error {
 	query := `
 	insert into team (name, password_hash) values (?, ?)
 	`
-	_, err := self.db.Exec(query, req.Name, req.EncryptedPassword)
+	_, err := self.db().Exec(query, req.Name, req.EncryptedPassword)
 	if serr, ok := err.(sqlite3.Error); ok && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
 		return ApplicationError{ErrorTeamNameAlreadyTaken}
 	}
@@ -226,8 +240,7 @@ func (self *applicationDataRepository) CreateTeamAccountReleation(req CreateTeam
 		join
 		(select id as team_id from team where name = ?)
 	`
-	result, err := self.db.Exec(query, req.AccountName, req.TeamName)
-
+	result, err := self.db().Exec(query, req.AccountName, req.TeamName)
 	if serr, ok := err.(sqlite3.Error); ok && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
 		return ApplicationError{ErrorAlreadyJoin}
 	}
@@ -242,7 +255,17 @@ func (self *applicationDataRepository) CreateTeamAccountReleation(req CreateTeam
 	return nil
 }
 
-func (self *applicationDataRepository) DeleteTeamAccountReleation(DeleteTeamAccountReleationRequest) error {
+func (self *applicationDataRepository) DeleteTeamAccountReleation(req DeleteTeamAccountReleationRequest) error {
+	query := `
+	delete from account_team where id in
+	(select account_team.id from account_team
+		join account on account_team.account_id = account.id
+		join team on account_team.team_id = team.id
+	where team.name = ? and account.name = ?)
+	`
+	_, err := self.db().Exec(query, req.TeamName, req.AccountName)
+	util.CheckInternalFatalError(err)
+
 	return nil
 }
 
@@ -250,7 +273,7 @@ func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team,
 	query := `
 	select name, id from team where name = ?
 	`
-	row := self.db.QueryRow(query, req.TeamName)
+	row := self.db().QueryRow(query, req.TeamName)
 
 	team := &model.Team{}
 	err := row.Scan(&team.Name, &team.Id)
@@ -263,12 +286,12 @@ func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team,
 	return team, nil
 }
 
-func (self *applicationDataRepository) UpdateAccountPassword(UpdateAccountPasswordRequest) (*model.Account, error) {
-	return nil, nil
+func (self *applicationDataRepository) UpdateAccountPassword(UpdateAccountPasswordRequest) error {
+	return nil
 }
 
-func (self *applicationDataRepository) UpdateAccountId(UpdateAccountIdRequest) (*model.Account, error) {
-	return nil, nil
+func (self *applicationDataRepository) UpdateAccountId(UpdateAccountIdRequest) error {
+	return nil
 }
 
 func (self *applicationDataRepository) GetAccountHistory(GetAccountHistoryRequest) ([]model.Hisotry, error) {

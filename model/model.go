@@ -2,9 +2,10 @@ package model
 
 // premetives
 type Account struct {
-	Id    int    `json:"id"`
-	Name  string `json:"name"`
-	Token string `json:access_token`
+	Id           int    `json:"id"`
+	Name         string `json:"name"`
+	Token        string `json:access_token`
+	PasswordHash string
 }
 
 type Hisotry struct {
