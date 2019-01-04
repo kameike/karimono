@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"database/sql"
+
 	. "github.com/kameike/karimono/error"
 	"github.com/kameike/karimono/model"
 	"github.com/kameike/karimono/util"
@@ -10,6 +12,7 @@ import (
 type AccountDataRepository interface {
 	CreateTeam(CreateTeamRequest) error
 	GetTeam(GetTeamRequest) (*model.Team, error)
+	GetTeams(GetTeamsRequest) ([]model.Team, error)
 	UpdateOrReplaceAccessToken(UpdateOrReqlaceAccessTokenRequest)
 	UpdateAccountId(UpdateAccountIdRequest) error
 	UpdateAccountPassword(UpdateAccountPasswordRequest) error
@@ -33,6 +36,11 @@ type CreateTeamRequest struct {
 type GetTeamRequest struct {
 	TeamName string
 }
+
+type GetTeamsRequest struct {
+	TeamName string
+}
+
 type UpdateOrReqlaceAccessTokenRequest struct {
 	AccountName string
 	NewToken    string
@@ -49,8 +57,43 @@ func (self *applicationDataRepository) UpdateOrReplaceAccessToken(req UpdateOrRe
 	util.CheckInternalFatalError(err)
 }
 
-func (self *applicationDataRepository) GetTeamPasswordHash(GetTeamPasswordHashRequest) (string, error) {
-	return "", nil
+func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team, error) {
+	query := `
+	select name, id from team where name = ?
+	`
+	row := self.db().QueryRow(query, req.TeamName)
+
+	team := &model.Team{}
+	err := row.Scan(&team.Name, &team.Id)
+
+	if err == sql.ErrNoRows {
+		return nil, ApplicationError{ErrorDataNotFount}
+	}
+	util.CheckInternalFatalError(err)
+
+	return team, nil
+}
+
+func (self *applicationDataRepository) GetTeams(req GetTeamsRequest) ([]model.Team, error) {
+	query := `
+	select team.id, team.name from team 
+	join account_team on team.id = account_team.team_id
+	join account on account.id = account_team.account_id
+	where account.name = ?
+	`
+
+	rows, err := self.db().Query(query, req.TeamName)
+	util.CheckInternalFatalError(err)
+
+	var teams []model.Team
+
+	for rows.Next() {
+		var team model.Team
+		rows.Scan(&team.Id, &team.Name)
+		teams = append(teams, team)
+	}
+
+	return teams, nil
 }
 
 func (self *applicationDataRepository) CreateTeam(req CreateTeamRequest) error {
@@ -94,4 +137,18 @@ func (self *applicationDataRepository) UpdateAccountId(req UpdateAccountIdReques
 	util.CheckInternalFatalError(err)
 
 	return nil
+}
+
+func (self *applicationDataRepository) GetTeamPasswordHash(req GetTeamPasswordHashRequest) (string, error) {
+	query := `
+	select password_hash from team
+	where name = ?
+	`
+	row := self.db().QueryRow(query, req.TeamName)
+
+	var pass string
+	err := row.Scan(&pass)
+	util.CheckInternalFatalError(err)
+
+	return pass, nil
 }

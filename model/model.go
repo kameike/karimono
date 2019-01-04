@@ -13,6 +13,13 @@ type Me struct {
 	PasswordHash string
 }
 
+func (me *Me) ToAccount() Account {
+	return Account{
+		Id:   me.Id,
+		Name: me.Name,
+	}
+}
+
 type Hisotry struct {
 	Text      string `json:"name"`
 	Timestamp string `json:"name"`

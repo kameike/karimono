@@ -25,20 +25,24 @@ func main() {
 	e.POST("/token", handler.SignIn)         //アカウント作成
 	e.PUT("/account", handler.UpdateAccount) //アカウント情報のアップデート
 
-	e.POST("/teams/id/menbers", stub)   // チームにサインインする
-	e.GET("/teams/id/menbers", stub)    // チームメンバーを一覧する
-	e.DELETE("/teams/id/menbers", stub) // チームから抜ける
+	e.POST("/teams", handler.CreateTeam) // チームにサインインする
 
-	e.GET("/teams", stub)                // 参加しているチームの情報を見る
-	e.POST("/teams", stub)               // チームを作成する
+	e.POST("/teams/id/menbers", handler.JoinTeam) // チームに参加する
+	e.GET("/teams/id/menbers", stub)              // チームメンバーを一覧する
+	e.DELETE("/teams/id/menbers", stub)           // チームから抜ける
+
+	e.GET("/teams", handler.GetTeams) // 参加しているチームの情報を見る
+
 	e.PUT("/teams/id", stub)             // チーム情報のアップデート
 	e.GET("/teams/id", stub)             // チーム情報を取得する
 	e.GET("/teams/id/histories", stub)   // チームで起きたことの履歴を見る
 	e.GET("/teams/id/borrowings", stub)  // チームでアイテムを借りる
 	e.POST("/teams/id/borrowings", stub) // チームでアイテムを借りる
 
-	e.GET("/borrowings", stub)      // 自分が借りているものを一覧する
-	e.POST("/returning/uuid", stub) // アイテムを返す
+	e.GET("/borrowings", handler.GetAccountBorrowing) // 自分が借りているものを一覧する
+	e.POST("/returning", stub)                        // アイテムを返す
+
+	e.GET("/histories", handler.GetAccountHistories) // 歴史
 
 	e.Start(":1323") //ポート番号指定してね
 }

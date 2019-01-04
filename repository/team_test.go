@@ -67,3 +67,29 @@ func TestLeaveTeam(t *testing.T) {
 
 	assertCountEqual(t, r.db(), "account_team", 0)
 }
+
+func TestGetTeam(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	teams, _ := r.GetTeams(GetTeamsRequest{
+		TeamName: dummyAccountName,
+	})
+
+	if len(teams) != 1 {
+		t.Fail()
+	}
+}
+
+func TestGetTeamPassowrd(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	password, _ := r.GetTeamPasswordHash(GetTeamPasswordHashRequest{
+		TeamName: dummyTeamName,
+	})
+
+	if password == "" {
+		t.Fail()
+	}
+}

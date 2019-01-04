@@ -20,7 +20,7 @@ type TeamPasswordProvider interface {
 
 type TeamCreateRequester interface {
 	TeamPasswordProvider
-	TeamIdProvider
+	TeamNameProvider
 }
 
 type AccountIdUpdateRequester interface {
@@ -48,6 +48,7 @@ type AccountDomain interface {
 	GetBorrowings() ([]model.Borrowing, error)
 	UpdateAccountPassword(AccountPasswordProvider) (*model.Me, error)
 	UpdateAccountId(AccountIdUpdateRequester) (*model.Me, error)
+	GetTeams() ([]model.Team, error)
 	GetAccount() *model.Me
 }
 
@@ -70,7 +71,7 @@ func (self *applicationAccountDomain) CreateTeam(req TeamCreateRequester) (*mode
 	r.BeginTransaction()
 
 	err := r.CreateTeam(repository.CreateTeamRequest{
-		Name:              req.TeamId(),
+		Name:              req.TeamName(),
 		EncryptedPassword: hashPassword(req.Password()),
 	})
 
@@ -79,7 +80,7 @@ func (self *applicationAccountDomain) CreateTeam(req TeamCreateRequester) (*mode
 	}
 
 	team, err := r.GetTeam(repository.GetTeamRequest{
-		TeamName: req.TeamId(),
+		TeamName: req.TeamName(),
 	})
 
 	if err != nil {
@@ -220,4 +221,15 @@ func (self *applicationAccountDomain) UpdateAccountId(req AccountIdUpdateRequest
 
 func (self *applicationAccountDomain) GetAccount() *model.Me {
 	return &self.account
+}
+
+func (self *applicationAccountDomain) GetTeams() ([]model.Team, error) {
+
+	r := self.repository
+
+	teams, err := r.GetTeams(repository.GetTeamsRequest{
+		TeamName: self.account.Name,
+	})
+
+	return teams, err
 }

@@ -1,10 +1,7 @@
 package repository
 
 import (
-	"database/sql"
-
 	. "github.com/kameike/karimono/error"
-	"github.com/kameike/karimono/model"
 	"github.com/kameike/karimono/util"
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
@@ -64,21 +61,4 @@ func (self *applicationDataRepository) DeleteTeamAccountReleation(req DeleteTeam
 	util.CheckInternalFatalError(err)
 
 	return nil
-}
-
-func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team, error) {
-	query := `
-	select name, id from team where name = ?
-	`
-	row := self.db().QueryRow(query, req.TeamName)
-
-	team := &model.Team{}
-	err := row.Scan(&team.Name, &team.Id)
-
-	if err == sql.ErrNoRows {
-		return nil, ApplicationError{ErrorDataNotFount}
-	}
-	util.CheckInternalFatalError(err)
-
-	return team, nil
 }

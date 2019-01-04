@@ -20,6 +20,42 @@ func UpdateAccount(c echo.Context) error {
 	return createHandler(c).updateAccount()
 }
 
+func CreateTeam(c echo.Context) error {
+	return handleWithAccountDomain(c, createTeam)
+}
+
+func JoinTeam(c echo.Context) error {
+	return handleWithAccountDomain(c, joinTeam)
+}
+
+func GetAccountBorrowing(c echo.Context) error {
+	return handleWithAccountDomain(c, getBorrowings)
+}
+
+func GetAccountHistories(c echo.Context) error {
+	return handleWithAccountDomain(c, getHistory)
+}
+
+func GetTeams(c echo.Context) error {
+	return handleWithAccountDomain(c, getTeams)
+}
+
+type accountDomainHandler func(domain.AccountDomain, *Handler)
+
+func handleWithAccountDomain(c echo.Context, handler accountDomainHandler) error {
+	h := createHandler(c)
+
+	a, err := h.provider.GetAccountDomain()
+	if err != nil {
+		h.renderError(err)
+		return nil
+	}
+
+	handler(a, h)
+
+	return nil
+}
+
 type errorResponse struct {
 	Message string `json:"message"`
 }
