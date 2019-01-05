@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/kameike/karimono/domain"
+	"github.com/kameike/karimono/util"
 	"github.com/labstack/echo"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -14,6 +15,10 @@ func SignUp(c echo.Context) error {
 
 func SignIn(c echo.Context) error {
 	return createHandler(c).renewAccessToken()
+}
+
+func ValidateAccount(c echo.Context) error {
+	return createHandler(c).validateAccount()
 }
 
 func UpdateAccount(c echo.Context) error {
@@ -85,6 +90,7 @@ func createHandler(c echo.Context) *Handler {
 
 	handler := Handler{
 		provider: domain.CreateApplicatoinDomains(&tokenProvider),
+		context:  c,
 	}
 
 	return &handler
@@ -93,7 +99,8 @@ func createHandler(c echo.Context) *Handler {
 func (self *Handler) bodyAsJson(target interface{}) {
 	c := self.context
 	d := json.NewDecoder(c.Request().Body)
-	d.Decode(target)
+	err := d.Decode(target)
+	util.CheckInternalFatalError(err)
 }
 
 func (self *Handler) renderError(err error) {

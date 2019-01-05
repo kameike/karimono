@@ -85,7 +85,7 @@ func getBorrowings(a domain.AccountDomain, h *Handler) {
 }
 
 type getTeamsResponse struct {
-	teams []model.Team
+	Teams []model.Team `json:"teams"`
 }
 
 func getTeams(a domain.AccountDomain, h *Handler) {
@@ -97,6 +97,6 @@ func getTeams(a domain.AccountDomain, h *Handler) {
 	}
 
 	h.renderJson(getTeamsResponse{
-		teams: t,
+		Teams: t,
 	})
 }

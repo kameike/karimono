@@ -85,7 +85,7 @@ func (self *applicationDataRepository) GetTeams(req GetTeamsRequest) ([]model.Te
 	rows, err := self.db().Query(query, req.TeamName)
 	util.CheckInternalFatalError(err)
 
-	var teams []model.Team
+	teams := make([]model.Team, 0, 20)
 
 	for rows.Next() {
 		var team model.Team

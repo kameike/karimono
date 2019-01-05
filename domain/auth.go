@@ -35,9 +35,14 @@ type AccountAccessTokenProvider interface {
 	AccountAccessToken() string
 }
 
+type NameCheckRequester interface {
+	AccountIdProvider
+}
+
 type AuthDomain interface {
 	CreateAccount(AccountCreateRequester) (*model.Me, error)
 	SignInAccount(AccountSignInRequester) (*model.Me, error)
+	CheckNameAvailable(NameCheckRequester) bool
 }
 
 type applicationAuthDomain struct {
@@ -65,12 +70,64 @@ func (self *applicationAuthDomain) CreateAccount(req AccountCreateRequester) (*m
 	account, err := self.repo.GetAccountWithSecretInfo(repository.GetAccountRequest{
 		Token: token,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return account, nil
 }
+func (self *applicationAuthDomain) CheckNameAvailable(req NameCheckRequester) bool {
+	r := self.repo
+
+	res, err := r.GetAccountWithName(repository.GetAccountRequestWithName{
+		Name: req.AccountId(),
+	})
+
+	if serr, ok := err.(ApplicationError); ok && serr.Code != ErrorDataNotFount {
+		return false
+	}
+
+	if res == nil {
+		return true
+	}
+
+	if err != nil {
+		return false
+	}
+
+	return false
+}
 
 func (self *applicationAuthDomain) SignInAccount(req AccountSignInRequester) (*model.Me, error) {
-	return nil, nil
+	r := self.repo
+
+	me, err := r.GetAccountWithName(repository.GetAccountRequestWithName{
+		Name: req.AccountId(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkPasswordHash(req.AccountPassword(), me.PasswordHash)
+
+	if err != nil {
+		return nil, err
+	}
+
+	token := newToken()
+
+	self.repo.UpdateOrReplaceAccessToken(repository.UpdateOrReqlaceAccessTokenRequest{
+		AccountName: req.AccountId(),
+		NewToken:    token,
+	})
+
+	me, err = self.repo.GetAccountWithSecretInfo(repository.GetAccountRequest{
+		Token: token,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return me, nil
 }
 
 func hashPassword(plainPass string) string {
@@ -90,5 +147,5 @@ func checkPasswordHash(plainPass string, hashedPassword string) error {
 }
 
 func newToken() string {
-	return util.RandString(100)
+	return util.RandString(128)
 }

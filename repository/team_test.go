@@ -1,8 +1,9 @@
 package repository
 
 import (
-	apperror "github.com/kameike/karimono/error"
 	"testing"
+
+	apperror "github.com/kameike/karimono/error"
 )
 
 func TestInvalidJoin(t *testing.T) {

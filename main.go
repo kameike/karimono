@@ -21,15 +21,19 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.POST("/account", handler.SignUp)       //アカウント作成
-	e.POST("/token", handler.SignIn)         //アカウント作成
-	e.PUT("/account", handler.UpdateAccount) //アカウント情報のアップデート
+	e.POST("/account", handler.SignUp)                     //アカウント作成
+	e.POST("/account/validation", handler.ValidateAccount) //アカウント作成
+	e.POST("/token", handler.SignIn)                       //アカウント作成
+	e.PUT("/account", handler.UpdateAccount)               //アカウント情報のアップデート
+
+	e.GET("/health", health)
 
 	e.POST("/teams", handler.CreateTeam) // チームにサインインする
+	//	e.POST("/teams/validation", handler.SignUp) //アカウント作成
 
-	e.POST("/teams/id/menbers", handler.JoinTeam) // チームに参加する
-	e.GET("/teams/id/menbers", stub)              // チームメンバーを一覧する
-	e.DELETE("/teams/id/menbers", stub)           // チームから抜ける
+	e.POST("/teams/menbers", handler.JoinTeam) // チームに参加する
+	e.GET("/teams/id/menbers", stub)           // チームメンバーを一覧する
+	e.DELETE("/teams/id/menbers", stub)        // チームから抜ける
 
 	e.GET("/teams", handler.GetTeams) // 参加しているチームの情報を見る
 
@@ -48,5 +52,14 @@ func main() {
 }
 
 func stub(c echo.Context) error {
+	return nil
+}
+
+type Health struct {
+	Status string
+}
+
+func health(c echo.Context) error {
+	c.JSON(200, Health{"ok"})
 	return nil
 }

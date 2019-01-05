@@ -18,6 +18,10 @@ type AuthCheckRequest struct {
 	AccessToken string
 }
 
+type GetAccountRequestWithName struct {
+	Name string
+}
+
 type GetAccountRequest struct {
 	Token string
 }
@@ -31,6 +35,7 @@ type AuthDataRepository interface {
 	CheckAccountTeamRelation(CheckAccountTeamRelationRequest) error
 	CheckAuth(AuthCheckRequest) error
 	GetAccountWithSecretInfo(GetAccountRequest) (*model.Me, error)
+	GetAccountWithName(GetAccountRequestWithName) (*model.Me, error)
 	InsertAccount(InsertAccountRequest) error
 }
 
@@ -70,6 +75,26 @@ func (self *applicationDataRepository) CheckAuth(req AuthCheckRequest) error {
 	} else {
 		return ApplicationError{ErrorInvalidAccessToken}
 	}
+}
+
+func (self *applicationDataRepository) GetAccountWithName(req GetAccountRequestWithName) (*model.Me, error) {
+	query := `
+	select account.id, account.name, account.password_hash, access_token.token from account
+	join access_token on access_token.account_id = account.id
+	where account.name = ?
+	`
+	row := self.db().QueryRow(query, req.Name)
+
+	var account model.Me
+	err := row.Scan(&account.Id, &account.Name, &account.PasswordHash, &account.Token)
+
+	if err == sql.ErrNoRows {
+		return nil, ApplicationError{ErrorDataNotFount}
+	}
+
+	util.CheckInternalFatalError(err)
+
+	return &account, nil
 }
 
 func (self *applicationDataRepository) GetAccountWithSecretInfo(req GetAccountRequest) (*model.Me, error) {

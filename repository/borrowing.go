@@ -56,7 +56,7 @@ func (self *applicationDataRepository) GetAccountBorrowing(req GetAccountBorrowi
 	defer rows.Close()
 	util.CheckInternalFatalError(err)
 
-	var borrowings []model.Borrowing
+	borrowings := make([]model.Borrowing, 0, 100)
 
 	for rows.Next() {
 		account := model.Account{}
@@ -99,7 +99,7 @@ func (self *applicationDataRepository) GetTeamBorrowing(req GetTeamBorrowingRequ
 	defer rows.Close()
 	util.CheckInternalFatalError(err)
 
-	var borrowings []model.Borrowing
+	borrowings := make([]model.Borrowing, 0, 100)
 
 	for rows.Next() {
 		account := model.Account{}

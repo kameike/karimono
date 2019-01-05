@@ -224,7 +224,6 @@ func (self *applicationAccountDomain) GetAccount() *model.Me {
 }
 
 func (self *applicationAccountDomain) GetTeams() ([]model.Team, error) {
-
 	r := self.repository
 
 	teams, err := r.GetTeams(repository.GetTeamsRequest{
