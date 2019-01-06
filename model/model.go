@@ -28,6 +28,7 @@ type Hisotry struct {
 type Borrowing struct {
 	ItemName string  `json:"itemName"`
 	Uuid     string  `json:"idHash"`
+	Memo     string  `json:"memo"`
 	Account  Account `json:"account"`
 	Team     Team    `json:"team"`
 }

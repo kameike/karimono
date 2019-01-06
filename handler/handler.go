@@ -43,6 +43,10 @@ func GetAccountHistories(c echo.Context) error {
 	return handleWithAccountDomain(c, getHistory)
 }
 
+func ReturnBorrowing(c echo.Context) error {
+	return handleWithAccountDomain(c, returnBorrowing)
+}
+
 func GetTeams(c echo.Context) error {
 	return handleWithAccountDomain(c, getTeams)
 }

@@ -32,6 +32,12 @@ type GetBorrowingRequest struct {
 	Id string
 }
 
+type GetBorrowingRequestWithName struct {
+	TeamName    string
+	AccountName string
+	ItemName    string
+}
+
 type BorrowingDataRepository interface {
 	CreateBorrowing(CreateBorrowingRequest) error
 	ReturnBorrowing(ReturnBorrowingRequest) error
@@ -55,7 +61,7 @@ func (self *applicationDataRepository) CreateBorrowing(req CreateBorrowingReques
 
 func (self *applicationDataRepository) GetAccountBorrowing(req GetAccountBorrowingRequset) ([]model.Borrowing, error) {
 	query := `
-	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	select borrowing.memo, borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
 	join account on account.id = borrowing.account_id
 	join team on team.id = borrowing.team_id
 	where account.name = ? and borrowing.has_return = false
@@ -71,6 +77,7 @@ func (self *applicationDataRepository) GetAccountBorrowing(req GetAccountBorrowi
 		team := model.Team{}
 		borrowing := model.Borrowing{}
 		rows.Scan(
+			&borrowing.Memo,
 			&borrowing.ItemName,
 			&borrowing.Uuid,
 			&account.Id,
@@ -96,9 +103,20 @@ func (self *applicationDataRepository) ReturnBorrowing(req ReturnBorrowingReques
 	return nil
 }
 
+func (self *applicationDataRepository) GetBorrowingWithName(req GetBorrowingRequestWithName) (*model.Borrowing, error) {
+	// query := `
+	// 	select borrowing.memo,  borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	// 	join account on account.id = borrowing.account_id
+	// 	join team on team.id = borrowing.team_id
+	// 	where borrowing.hashed_id = ?
+	// 	`
+
+	return nil, nil
+}
+
 func (self *applicationDataRepository) GetBorrowing(req GetBorrowingRequest) (*model.Borrowing, error) {
 	query := `
-	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	select borrowing.memo,  borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
 	join account on account.id = borrowing.account_id
 	join team on team.id = borrowing.team_id
 	where borrowing.hashed_id = ?
@@ -109,6 +127,7 @@ func (self *applicationDataRepository) GetBorrowing(req GetBorrowingRequest) (*m
 	team := model.Team{}
 	borrowing := model.Borrowing{}
 	err := row.Scan(
+		&borrowing.Memo,
 		&borrowing.ItemName,
 		&borrowing.Uuid,
 		&account.Id,
@@ -128,7 +147,7 @@ func (self *applicationDataRepository) GetBorrowing(req GetBorrowingRequest) (*m
 
 func (self *applicationDataRepository) GetTeamBorrowing(req GetTeamBorrowingRequest) ([]model.Borrowing, error) {
 	query := `
-	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	select borrowing.memo, borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
 	join account on account.id = borrowing.account_id
 	join team on team.id = borrowing.team_id
 	where team.name = ? and borrowing.has_return = false
@@ -144,6 +163,7 @@ func (self *applicationDataRepository) GetTeamBorrowing(req GetTeamBorrowingRequ
 		team := model.Team{}
 		borrowing := model.Borrowing{}
 		rows.Scan(
+			&borrowing.Memo,
 			&borrowing.ItemName,
 			&borrowing.Uuid,
 			&account.Id,

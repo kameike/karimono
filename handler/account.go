@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/kameike/karimono/domain"
+	"github.com/kameike/karimono/error"
 	"github.com/kameike/karimono/model"
 )
 
@@ -35,6 +36,28 @@ func createTeam(a domain.AccountDomain, h *Handler) {
 	h.renderJson(createTeamResponse{
 		Team: *team,
 	})
+}
+
+func returnBorrowing(a domain.AccountDomain, h *Handler) {
+	req := h.context.Param("idHash")
+
+	if req == "" {
+		h.renderError(apperror.ApplicationError{apperror.ErrorRequestFormat})
+		return
+	}
+
+	b, er := a.RetrunBorrowingWithHash(req)
+	if er != nil {
+		h.renderError(er)
+		return
+	}
+
+	var res struct {
+		Borrwoing model.Borrowing `json:"borrowing"`
+	}
+	res.Borrwoing = *b
+
+	h.renderJson(res)
 }
 
 func joinTeam(a domain.AccountDomain, h *Handler) {

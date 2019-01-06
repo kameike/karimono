@@ -43,8 +43,9 @@ func main() {
 	e.GET("/teams/:id/borrowings", handler.GetTeamBorrowings) // チームでアイテムを借りる
 	e.POST("/borrowings", handler.CreateBorrowing)            // チームでアイテムを借りる
 
-	e.GET("/borrowings", handler.GetAccountBorrowing) // 自分が借りているものを一覧する
-	e.POST("/returning", stub)                        // アイテムを返す
+	e.GET("/borrowings", handler.GetAccountBorrowing)        // 自分が借りているものを一覧する
+	e.DELETE("/borrowings/:idHash", handler.RetrunBorrowing) // アイテムを返す
+	e.DELETE("/borrowings", stub)                            // アイテムを返す
 
 	e.GET("/histories", handler.GetAccountHistories) // 歴史
 

@@ -41,6 +41,8 @@ type AccountDomain interface {
 	UpdateAccountId(AccountIdUpdateRequester) (*model.Me, error)
 	GetTeams() ([]model.Team, error)
 	GetAccount() *model.Me
+
+	RetrunBorrowingWithHash(string) (*model.Borrowing, error)
 }
 
 func createAccountApplicatoinDomain(account model.Me, repo repository.DataRepository) AccountDomain {
@@ -90,6 +92,28 @@ func (self *applicationAccountDomain) CreateTeam(req TeamCreateRequester) (*mode
 
 	r.EndTransaction()
 	return team, nil
+}
+
+func (self *applicationAccountDomain) RetrunBorrowingWithHash(hash string) (*model.Borrowing, error) {
+	r := self.repository
+
+	b, err := r.GetBorrowing(repository.GetBorrowingRequest{
+		Id: hash,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.ReturnBorrowing(repository.ReturnBorrowingRequest{
+		BorrowingId: hash,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
 
 func (self *applicationAccountDomain) JoinTeam(req JoinTeamRequester) (*model.Team, error) {
