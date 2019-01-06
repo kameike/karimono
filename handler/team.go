@@ -25,22 +25,6 @@ type returnItemRequest struct {
 	IdHash string `json:"idHash"`
 }
 
-func RetrunBorrowing(c echo.Context) error {
-	h := createHandler(c)
-
-	var req returnItemRequest
-	h.bodyAsJson(&req)
-
-	_, err := h.provider.GetAccountDomain()
-
-	if err != nil {
-		h.renderError(err)
-		return nil
-	}
-
-	return nil
-}
-
 func CreateBorrowing(c echo.Context) error {
 	h := createHandler(c)
 
