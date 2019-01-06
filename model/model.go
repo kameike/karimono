@@ -9,7 +9,7 @@ type Account struct {
 type Me struct {
 	Id           int    `json:"id"`
 	Name         string `json:"name"`
-	Token        string `json:access_token`
+	Token        string
 	PasswordHash string
 }
 
@@ -22,14 +22,14 @@ func (me *Me) ToAccount() Account {
 
 type Hisotry struct {
 	Text      string `json:"name"`
-	Timestamp string `json:"name"`
+	Timestamp string `json:"timestamp"`
 }
 
 type Borrowing struct {
 	ItemName string  `json:"itemName"`
-	Uuid     string  `json:"uuid"`
+	Uuid     string  `json:"idHash"`
 	Account  Account `json:"account"`
-	Team     Team    `json:"account"`
+	Team     Team    `json:"team"`
 }
 
 type Team struct {

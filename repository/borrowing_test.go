@@ -89,6 +89,10 @@ func TestGetTeamBorrowing(t *testing.T) {
 		t.Fatalf("%d should be %d", len(result), 2)
 	}
 
+	f := result[0]
+	if f.Account.Name != dummyAccountName {
+		t.Fail()
+	}
 }
 
 func TestReturnItem(t *testing.T) {

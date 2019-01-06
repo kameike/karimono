@@ -41,7 +41,11 @@ func CreateBorrowing(c echo.Context) error {
 		return nil
 	}
 
-	h.renderJson(item)
+	type res struct {
+		Borrwoing model.Borrowing `json:"borrowing"`
+	}
+
+	h.renderJson(res{*item})
 
 	return nil
 }
