@@ -42,6 +42,28 @@ func TestGetAccountBorrowing(t *testing.T) {
 	}
 }
 
+func TestGetBorrowing(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+
+	id := "borrowingLognHash"
+
+	r.CreateBorrowing(CreateBorrowingRequest{
+		BorrowingId:      id,
+		BorrwoedTeam:     dummyTeamName,
+		BorrwoingAccount: dummyAccountName,
+		ItemName:         "any thing",
+	})
+
+	result, _ := r.GetBorrowing(GetBorrowingRequest{
+		Id: id,
+	})
+
+	if result.Uuid != id {
+		t.Fatalf("'%s' is not '%s'", result.Uuid, id)
+	}
+}
+
 func TestGetTeamBorrowing(t *testing.T) {
 	r := inMemoryRepo()
 	dummyAccountJoinToDummyTeam(r)

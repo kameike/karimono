@@ -51,6 +51,7 @@ func (self *applicationDataRepository) CheckAccountTeamRelation(req CheckAccount
 	 `
 
 	rows, err := self.db().Query(query, req.TeamName, req.AccountName)
+	defer rows.Close()
 	util.CheckInternalFatalError(err)
 
 	if rows.Next() {

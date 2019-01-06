@@ -6,20 +6,20 @@ import (
 )
 
 type createTeamRequest struct {
-	name     string
-	password string
+	Name string `json:"name"`
+	Pass string `json:"password"`
 }
 
 type createTeamResponse struct {
-	team model.Team
+	Team model.Team `json:"team"`
 }
 
 func (r createTeamRequest) TeamName() string {
-	return r.name
+	return r.Name
 }
 
 func (r createTeamRequest) Password() string {
-	return r.password
+	return r.Pass
 }
 
 func createTeam(a domain.AccountDomain, h *Handler) {
@@ -33,7 +33,7 @@ func createTeam(a domain.AccountDomain, h *Handler) {
 	}
 
 	h.renderJson(createTeamResponse{
-		team: *team,
+		Team: *team,
 	})
 }
 
@@ -48,7 +48,7 @@ func joinTeam(a domain.AccountDomain, h *Handler) {
 	}
 
 	h.renderJson(createTeamResponse{
-		team: *team,
+		Team: *team,
 	})
 }
 

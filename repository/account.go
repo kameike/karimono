@@ -12,6 +12,7 @@ import (
 type AccountDataRepository interface {
 	CreateTeam(CreateTeamRequest) error
 	GetTeam(GetTeamRequest) (*model.Team, error)
+	GetTeamWithId(GetTeamWithIdRequest) (*model.Team, error)
 	GetTeams(GetTeamsRequest) ([]model.Team, error)
 	UpdateOrReplaceAccessToken(UpdateOrReqlaceAccessTokenRequest)
 	UpdateAccountId(UpdateAccountIdRequest) error
@@ -37,7 +38,12 @@ type GetTeamRequest struct {
 	TeamName string
 }
 
+type GetTeamWithIdRequest struct {
+	Id int
+}
+
 type GetTeamsRequest struct {
+	// this should be account name
 	TeamName string
 }
 
@@ -55,6 +61,23 @@ func (self *applicationDataRepository) UpdateOrReplaceAccessToken(req UpdateOrRe
 	util.CheckInternalFatalError(err)
 	_, err = smit.Exec(req.NewToken, req.AccountName)
 	util.CheckInternalFatalError(err)
+}
+
+func (self *applicationDataRepository) GetTeamWithId(req GetTeamWithIdRequest) (*model.Team, error) {
+	query := `
+	select name, id from team where id = ?
+	`
+	row := self.db().QueryRow(query, req.Id)
+
+	team := &model.Team{}
+	err := row.Scan(&team.Name, &team.Id)
+
+	if err == sql.ErrNoRows {
+		return nil, ApplicationError{ErrorDataNotFount}
+	}
+	util.CheckInternalFatalError(err)
+
+	return team, nil
 }
 
 func (self *applicationDataRepository) GetTeam(req GetTeamRequest) (*model.Team, error) {
@@ -148,6 +171,11 @@ func (self *applicationDataRepository) GetTeamPasswordHash(req GetTeamPasswordHa
 
 	var pass string
 	err := row.Scan(&pass)
+
+	if err == sql.ErrNoRows {
+		return "", ApplicationError{ErrorDataNotFount}
+	}
+
 	util.CheckInternalFatalError(err)
 
 	return pass, nil

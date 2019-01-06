@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"database/sql"
+
+	. "github.com/kameike/karimono/error"
 	"github.com/kameike/karimono/model"
 	"github.com/kameike/karimono/util"
 )
@@ -25,11 +28,16 @@ type GetTeamBorrowingRequest struct {
 	TeamName string
 }
 
+type GetBorrowingRequest struct {
+	Id string
+}
+
 type BorrowingDataRepository interface {
 	CreateBorrowing(CreateBorrowingRequest) error
 	ReturnBorrowing(ReturnBorrowingRequest) error
 	GetAccountBorrowing(GetAccountBorrowingRequset) ([]model.Borrowing, error)
 	GetTeamBorrowing(GetTeamBorrowingRequest) ([]model.Borrowing, error)
+	GetBorrowing(GetBorrowingRequest) (*model.Borrowing, error)
 }
 
 func (self *applicationDataRepository) CreateBorrowing(req CreateBorrowingRequest) error {
@@ -86,6 +94,36 @@ func (self *applicationDataRepository) ReturnBorrowing(req ReturnBorrowingReques
 	util.CheckInternalFatalError(err)
 
 	return nil
+}
+
+func (self *applicationDataRepository) GetBorrowing(req GetBorrowingRequest) (*model.Borrowing, error) {
+	query := `
+	select borrowing.name, borrowing.hashed_id, account.id, account.name, team.id, team.name from borrowing
+	join account on account.id = borrowing.account_id
+	join team on team.id = borrowing.team_id
+	where borrowing.hashed_id = ?
+	`
+	row := self.db().QueryRow(query, req.Id)
+
+	account := model.Account{}
+	team := model.Team{}
+	borrowing := model.Borrowing{}
+	err := row.Scan(
+		&borrowing.ItemName,
+		&borrowing.Uuid,
+		&account.Id,
+		&account.Name,
+		&team.Id,
+		&team.Name)
+	borrowing.Account = account
+	borrowing.Team = team
+
+	if err == sql.ErrNoRows {
+		return nil, ApplicationError{ErrorDataNotFount}
+	}
+	util.CheckInternalFatalError(err)
+
+	return &borrowing, nil
 }
 
 func (self *applicationDataRepository) GetTeamBorrowing(req GetTeamBorrowingRequest) ([]model.Borrowing, error) {

@@ -66,6 +66,10 @@ func (self *applicationDataRepository) EndTransaction() {
 }
 
 func (self *applicationDataRepository) CancelTransaction() {
+	if self._tx == nil {
+		return
+	}
+
 	self._tx.Rollback()
 	self._tx = nil
 }

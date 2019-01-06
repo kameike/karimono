@@ -31,17 +31,17 @@ func main() {
 	e.POST("/teams", handler.CreateTeam) // チームにサインインする
 	//	e.POST("/teams/validation", handler.SignUp) //アカウント作成
 
-	e.POST("/teams/menbers", handler.JoinTeam) // チームに参加する
-	e.GET("/teams/id/menbers", stub)           // チームメンバーを一覧する
-	e.DELETE("/teams/id/menbers", stub)        // チームから抜ける
+	e.POST("/teams/menbers", handler.JoinTeam)             // チームに参加する
+	e.GET("/teams/:id/menbers", handler.GetTeamBorrowings) // チームメンバーを一覧する
+	e.DELETE("/teams/:id/menbers", stub)                   // チームから抜ける
 
 	e.GET("/teams", handler.GetTeams) // 参加しているチームの情報を見る
 
-	e.PUT("/teams/id", stub)             // チーム情報のアップデート
-	e.GET("/teams/id", stub)             // チーム情報を取得する
-	e.GET("/teams/id/histories", stub)   // チームで起きたことの履歴を見る
-	e.GET("/teams/id/borrowings", stub)  // チームでアイテムを借りる
-	e.POST("/teams/id/borrowings", stub) // チームでアイテムを借りる
+	e.PUT("/teams/:id", stub)                                 // チーム情報のアップデート
+	e.GET("/teams/:id", stub)                                 // チーム情報を取得する
+	e.GET("/teams/:id/histories", stub)                       // チームで起きたことの履歴を見る
+	e.GET("/teams/:id/borrowings", handler.GetTeamBorrowings) // チームでアイテムを借りる
+	e.POST("/borrowings", handler.CreateBorrowing)            // チームでアイテムを借りる
 
 	e.GET("/borrowings", handler.GetAccountBorrowing) // 自分が借りているものを一覧する
 	e.POST("/returning", stub)                        // アイテムを返す

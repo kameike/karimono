@@ -94,3 +94,14 @@ func TestGetTeamPassowrd(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestGetTeamMembers(t *testing.T) {
+	r := inMemoryRepo()
+	dummyAccountJoinToDummyTeam(r)
+	tm, _ := r.GetTeam(GetTeamRequest{dummyTeamName})
+	res, _ := r.GetTeamMembers(GetTeamMenbersRequest{tm.Id})
+
+	if len(res) != 1 {
+		t.Fail()
+	}
+}

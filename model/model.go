@@ -34,5 +34,5 @@ type Borrowing struct {
 
 type Team struct {
 	Name string `json:"name"`
-	Id   string `json:"id"`
+	Id   int    `json:"id"`
 }

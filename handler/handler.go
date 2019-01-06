@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/kameike/karimono/domain"
+	. "github.com/kameike/karimono/error"
 	"github.com/kameike/karimono/util"
 	"github.com/labstack/echo"
 	_ "github.com/mattn/go-sqlite3"
@@ -45,6 +47,14 @@ func GetTeams(c echo.Context) error {
 	return handleWithAccountDomain(c, getTeams)
 }
 
+func GetTeamMenbers(c echo.Context) error {
+	return handleWithTeamDomain(c, getTeamMenbers)
+}
+
+func GetTeamBorrowings(c echo.Context) error {
+	return handleWithTeamDomain(c, getTeamBorrowing)
+}
+
 type accountDomainHandler func(domain.AccountDomain, *Handler)
 
 func handleWithAccountDomain(c echo.Context, handler accountDomainHandler) error {
@@ -57,6 +67,39 @@ func handleWithAccountDomain(c echo.Context, handler accountDomainHandler) error
 	}
 
 	handler(a, h)
+
+	return nil
+}
+
+type teamDomainHandler func(domain.TeamDomain, *Handler)
+
+type idProvider struct {
+	id int
+}
+
+func (p idProvider) TeamId() int {
+	return p.id
+}
+
+func handleWithTeamDomain(c echo.Context, handler teamDomainHandler) error {
+	h := createHandler(c)
+
+	id, err := strconv.Atoi(c.Param("id"))
+
+	if err != nil {
+		h.renderError(ApplicationError{ErrorRequestFormat})
+		return nil
+	}
+
+	t, err := h.provider.GetTeamDomain(idProvider{id})
+
+	if serr, ok := err.(ApplicationError); ok {
+		h.renderError(serr)
+		return nil
+	}
+	util.CheckInternalFatalError(err)
+
+	handler(t, h)
 
 	return nil
 }

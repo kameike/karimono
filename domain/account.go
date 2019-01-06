@@ -5,15 +5,6 @@ import (
 	"github.com/kameike/karimono/repository"
 )
 
-// Interfaces
-type TeamIdProvider interface {
-	TeamId() string
-}
-
-type TeamNameProvider interface {
-	TeamName() string
-}
-
 type TeamPasswordProvider interface {
 	Password() string
 }
@@ -69,6 +60,7 @@ type applicationAccountDomain struct {
 func (self *applicationAccountDomain) CreateTeam(req TeamCreateRequester) (*model.Team, error) {
 	r := self.repository
 	r.BeginTransaction()
+	defer r.CancelTransaction()
 
 	err := r.CreateTeam(repository.CreateTeamRequest{
 		Name:              req.TeamName(),
@@ -102,6 +94,9 @@ func (self *applicationAccountDomain) CreateTeam(req TeamCreateRequester) (*mode
 
 func (self *applicationAccountDomain) JoinTeam(req JoinTeamRequester) (*model.Team, error) {
 	r := self.repository
+
+	println(req.TeamName())
+	println(req.Password())
 
 	targetHash, err := r.GetTeamPasswordHash(repository.GetTeamPasswordHashRequest{
 		TeamName: req.TeamName(),
@@ -164,6 +159,7 @@ func (self *applicationAccountDomain) GetBorrowings() ([]model.Borrowing, error)
 func (self *applicationAccountDomain) UpdateAccountPassword(req AccountPasswordProvider) (*model.Me, error) {
 	r := self.repository
 	r.BeginTransaction()
+	defer r.CancelTransaction()
 
 	err := r.UpdateAccountPassword(repository.UpdateAccountPasswordRequest{
 		AccountName:    self.account.Name,

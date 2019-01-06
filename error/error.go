@@ -8,6 +8,7 @@ const ErrorDataNotFount = 4
 const ErrorTeamNameAlreadyTaken = 5
 const ErrorAlreadyJoin = 6
 const ErrorNoRelationBetweenUserAndTeam = 7
+const ErrorRequestFormat = 8
 
 type ApplicationError struct {
 	Code int

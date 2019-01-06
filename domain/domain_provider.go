@@ -9,6 +9,7 @@ type DomainsProvider interface {
 	GetAuthDomain() AuthDomain
 	GetAccountDomain() (AccountDomain, error)
 	GetTeamDomain(TeamIdProvider) (TeamDomain, error)
+	GetTeamProviderViaTeamName(req string) (TeamDomain, error)
 	CloseSession()
 }
 
@@ -75,6 +76,28 @@ func (self *applicationDomainProvider) GetAccountDomain() (AccountDomain, error)
 	return domain, nil
 }
 
+type internalTeamIdprovider struct {
+	id int
+}
+
+func (p internalTeamIdprovider) TeamId() int {
+	return p.id
+}
+
+func (self *applicationDomainProvider) GetTeamProviderViaTeamName(req string) (TeamDomain, error) {
+	r := self.repository
+
+	t, err := r.GetTeam(repository.GetTeamRequest{
+		TeamName: req,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return self.GetTeamDomain(internalTeamIdprovider{t.Id})
+}
+
 func (self *applicationDomainProvider) GetTeamDomain(req TeamIdProvider) (TeamDomain, error) {
 	accountDomain, err := self.GetAccountDomain()
 	if err != nil {
@@ -85,17 +108,17 @@ func (self *applicationDomainProvider) GetTeamDomain(req TeamIdProvider) (TeamDo
 
 	r := self.repository
 
-	err = r.CheckAccountTeamRelation(repository.CheckAccountTeamRelationRequest{
-		AccountName: account.Name,
-		TeamName:    req.TeamId(),
+	team, err := r.GetTeamWithId(repository.GetTeamWithIdRequest{
+		Id: req.TeamId(),
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	team, err := r.GetTeam(repository.GetTeamRequest{
-		TeamName: req.TeamId(),
+	err = r.CheckAccountTeamRelation(repository.CheckAccountTeamRelationRequest{
+		AccountName: account.Name,
+		TeamName:    team.Name,
 	})
 
 	if err != nil {
