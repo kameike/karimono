@@ -135,5 +135,5 @@ func (self *applicationTeamDomain) GetTeamBorrowings() ([]model.Borrowing, error
 }
 
 func randomBorrowingId() string {
-	return util.RandString(100)
+	return util.RandString(48)
 }
