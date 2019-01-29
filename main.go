@@ -9,12 +9,11 @@ import (
 )
 
 func main() {
-	os.Getenv("KARIMONO_PATH")
-	err := os.MkdirAll("tmp", 0770)
-	if err != nil {
-		println(err.Error())
-		panic("failt to make tmp")
+	path := os.Getenv("KARIMONO_DB_PATH")
+	if path == "" {
+		panic("failed to init due to evn KARIMONO_DB_PATH is not set")
 	}
+
 	// Echoのインスタンス作る
 	e := echo.New()
 

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"database/sql"
+	"os"
+
 	"github.com/kameike/karimono/util"
 )
 
@@ -30,7 +32,9 @@ func CreateApplicationDataRepository() DataRepository {
 }
 
 func openDb() *sql.DB {
-	db, err := sql.Open("sqlite3", "./db/main.db")
+	path := os.Getenv("KARIMONO_DB_PATH")
+	db, err := sql.Open("sqlite3", path)
+
 	util.CheckInternalFatalError(err)
 	return db
 }
