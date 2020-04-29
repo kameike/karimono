@@ -1,5 +1,5 @@
 FROM golang:alpine
-MAINTAINER KAMEIKE
+MAINTAINER kameike
 
 RUN apk add --update gcc musl-dev
 RUN apk add --update git
